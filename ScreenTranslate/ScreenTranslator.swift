@@ -93,10 +93,12 @@ enum ScreenTranslator {
         let size = CGSize(width: image.width, height: image.height)
 
         // Keep lines that need translating, plus price-only lines like "$12.99" when converting.
+        var recognized = try TextRecognizer.recognizeLines(in: image, language: settings.source).filter { line in
+            !(settings.skipStatusBar && TextGeometry.isInStatusBar(line.rect, imageSize: size))
+        }
+        LanguageDetector.assignLanguages(to: &recognized, source: settings.source, target: settings.target)
         var lines: [TextLine] = []
-        for var line in try TextRecognizer.recognizeLines(in: image, language: settings.source) {
-            if settings.skipStatusBar, TextGeometry.isInStatusBar(line.rect, imageSize: size) { continue }
-            line.language = LanguageDetector.sourceLanguage(of: line.text, source: settings.source, target: settings.target)
+        for line in recognized {
             let hasForeignPrice = settings.prices.map { options in
                 PriceParser.prices(in: line.text, language: settings.source).contains { $0.currency != options.currency }
             } ?? false

@@ -55,15 +55,11 @@ final class SampleHandler: RPBroadcastSampleHandler {
         guard let lines = try? TextRecognizer.recognizeLines(in: pixelBuffer, orientation: orientation, language: config.source) else { return }
         let size = TextRecognizer.orientedSize(of: pixelBuffer, orientation: orientation)
 
-        var foreign: [TextLine] = []
-        for var line in lines where !TextGeometry.isInStatusBar(line.rect, imageSize: size) {
-            // Text already in the user's language is skipped, which includes the floating
-            // window's own translations when it sits over the screen.
-            line.language = LanguageDetector.sourceLanguage(of: line.text, source: config.source, target: config.target)
-            if line.language != nil {
-                foreign.append(line)
-            }
-        }
+        // Text already in the user's language is skipped, which includes the floating window's
+        // own translations when it sits over the screen.
+        var onScreen = lines.filter { !TextGeometry.isInStatusBar($0.rect, imageSize: size) }
+        LanguageDetector.assignLanguages(to: &onScreen, source: config.source, target: config.target)
+        let foreign = onScreen.filter { $0.language != nil }
 
         let blocks: [LiveBlock] = TextGeometry.groupIntoBlocks(foreign).compactMap { block in
             guard let language = block.language else { return nil }
