@@ -33,7 +33,7 @@ struct LiveView: View {
                           systemImage: "pip")
                 }
                 .disabled(!live.canFloat && !live.isFloating)
-                Text("3. Switch to any app. The window follows what's on your screen and translates it about once a second. Drag it aside, pinch to resize, or press pause.")
+                Text("3. Switch to any app. The window follows what's on your screen and translates it about once a second. Swipe it to the edge of the screen to tuck it away as a small tab, and tap the tab to bring it back. To pause and resume from the Action Button or Control Center, add the \"Pause or Resume Live Translation\" action to a shortcut.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {

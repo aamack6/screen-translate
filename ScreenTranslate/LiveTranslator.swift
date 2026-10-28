@@ -25,6 +25,8 @@ final class LiveTranslator: NSObject, ObservableObject {
     private var translationsTarget: AppLanguage?
     private var lastFrameDate: Date?
     private var lastFrameArrival: Date?
+    /// The screen as last seen, shown again on resume (the extension only sends changes).
+    private var latestFrame: LiveFrame?
     private var work: Task<Void, Never>?
     private var listener: NWListener?
     /// The connection from the broadcast extension, while it runs.
@@ -125,6 +127,18 @@ final class LiveTranslator: NSObject, ObservableObject {
         showStatus()
     }
 
+    /// Pauses or resumes translating, from the floating window's play button or the Shortcuts
+    /// action (Action Button, Control Center).
+    func togglePaused() {
+        isPaused.toggle()
+        showStatus()
+        pip?.invalidatePlaybackState()
+        if !isPaused, let latestFrame {
+            lastFrameDate = nil
+            frameArrived(latestFrame)
+        }
+    }
+
     func toggleFloating() {
         guard let pip else { return }
         if pip.isPictureInPictureActive {
@@ -137,6 +151,7 @@ final class LiveTranslator: NSObject, ObservableObject {
     // MARK: - Updates
 
     private func frameArrived(_ frame: LiveFrame) {
+        latestFrame = frame
         guard !isPaused, frame.date != lastFrameDate else { return }
         lastFrameDate = frame.date
         isBroadcasting = true
@@ -229,9 +244,7 @@ extension LiveTranslator: AVPictureInPictureSampleBufferPlaybackDelegate {
     /// The play/pause button in the floating window pauses translating.
     nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
         Task { @MainActor in
-            self.isPaused = !playing
-            self.showStatus()
-            pictureInPictureController.invalidatePlaybackState()
+            if self.isPaused == playing { self.togglePaused() }
         }
     }
 
@@ -255,9 +268,9 @@ extension LiveTranslator: AVPictureInPictureSampleBufferPlaybackDelegate {
 
 /// Draws the translations as a "video frame" for the floating window.
 enum LivePanelRenderer {
-    /// Wide 16:9, like a video, so the window is a short strip that covers little of the screen.
-    /// Users can pinch it larger.
-    static let size = CGSize(width: 640, height: 360)
+    /// A wide 3:1 strip, so the window covers as little of the screen as iOS allows. Users can
+    /// pinch it larger, or swipe it to the edge of the screen to tuck it away.
+    static let size = CGSize(width: 720, height: 240)
 
     static func sampleBuffer(lines: [String], footer: String?) -> CMSampleBuffer? {
         guard let image = render(lines: lines, footer: footer).cgImage,
@@ -290,9 +303,9 @@ enum LivePanelRenderer {
             // Shrink the text until everything fits, down to a size that's still readable;
             // past that, the lowest lines are cut.
             let available = bottom - inset
-            var fontSize: CGFloat = 26
+            var fontSize: CGFloat = 24
             var text = attributed(lines, fontSize: fontSize)
-            while fontSize > 16, height(of: text, width: width) > available {
+            while fontSize > 15, height(of: text, width: width) > available {
                 fontSize -= 2
                 text = attributed(lines, fontSize: fontSize)
             }
