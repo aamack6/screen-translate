@@ -17,6 +17,11 @@ struct ResultView: View {
                 ForEach(Array(regions.enumerated()), id: \.offset) { _, region in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(region.translated)
+                        ForEach(region.notes, id: \.self) { note in
+                            Text(note)
+                                .font(.callout)
+                                .foregroundStyle(note.hasPrefix("⚠") ? Color.orange : Color.green)
+                        }
                         Text(region.original).font(.footnote).foregroundStyle(.secondary)
                     }
                     .textSelection(.enabled)

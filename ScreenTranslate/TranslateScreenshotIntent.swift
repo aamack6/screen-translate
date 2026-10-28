@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 struct TranslateScreenshotIntent: AppIntent {
     static let title: LocalizedStringResource = "Translate Screenshot"
     static let description = IntentDescription(
-        "Finds text in a screenshot, translates it to English on this iPhone, and returns the screenshot with the English drawn over the original text. Download the languages in ScreenTranslate first."
+        "Finds text in a screenshot, translates it on this iPhone, and returns the screenshot with the translation drawn over the original text. Download the languages in ScreenTranslate first."
     )
     static let openAppWhenRun = false
 
@@ -16,18 +16,21 @@ struct TranslateScreenshotIntent: AppIntent {
     @Parameter(title: "From", description: "Leave empty to use the language chosen in the app.")
     var language: SourceLanguage?
 
+    @Parameter(title: "To", description: "Leave empty to use the language chosen in the app.")
+    var target: TargetLanguage?
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Translate \(\.$screenshot) to English") {
+        Summary("Translate \(\.$screenshot)") {
             \.$language
+            \.$target
         }
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
-        let result = try await ScreenTranslator.translate(
-            screenshot.data,
-            source: language ?? AppSettings.sourceLanguage,
-            options: AppSettings.overlayOptions
-        )
+        var settings = TranslationSettings.current
+        if let language { settings.source = language }
+        if let target { settings.target = target }
+        let result = try await ScreenTranslator.translate(screenshot.data, settings: settings)
         if AppSettings.keepHistory, !result.regions.isEmpty {
             try? HistoryStore().add(result)
         }
@@ -36,11 +39,30 @@ struct TranslateScreenshotIntent: AppIntent {
 }
 
 extension SourceLanguage: AppEnum {
-    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Language"
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Source Language"
     static let caseDisplayRepresentations: [SourceLanguage: DisplayRepresentation] = [
         .japanese: "Japanese",
         .chineseSimplified: "Chinese (Simplified)",
         .chineseTraditional: "Chinese (Traditional)",
         .korean: "Korean",
+    ]
+}
+
+// App Intents reads these at build time, so they must be written out as literals.
+extension TargetLanguage: AppEnum {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Target Language"
+    static let caseDisplayRepresentations: [TargetLanguage: DisplayRepresentation] = [
+        .english: "English",
+        .spanish: "Spanish",
+        .french: "French",
+        .german: "German",
+        .italian: "Italian",
+        .portuguese: "Portuguese",
+        .dutch: "Dutch",
+        .polish: "Polish",
+        .turkish: "Turkish",
+        .indonesian: "Indonesian",
+        .vietnamese: "Vietnamese",
+        .thai: "Thai",
     ]
 }

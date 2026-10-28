@@ -1,8 +1,18 @@
 # ScreenTranslate
 
 An iPhone app that translates the text in a screenshot with one press of the Action Button. It reads Japanese,
-Chinese or Korean text, translates it to English, and draws the English over the original text. Everything runs on
-the iPhone with Apple's Vision and Translation frameworks: no account, no API key, nothing sent to a server.
+Chinese or Korean text, translates it into English or another language, and draws the translation over the original
+text. Translation runs on the iPhone with Apple's Vision and Translation frameworks: no account, no API key, no
+screenshot ever leaves the phone.
+
+Made for shopping and collecting from Japan:
+
+- **Convert prices** (optional): ¥12,800, 12,800円, 1万2000円, 150元, NT$990 or 25,000원 get an estimate in USD, EUR,
+  GBP and other currencies underneath, plus a "with fees" total if you enter extra costs such as a proxy-service fee.
+  Exchange rates come from [ExchangeRate-API](https://www.exchangerate-api.com)'s free endpoint, are cached for
+  12 hours, and the request contains only a currency code.
+- **Explain condition words** (Japanese, on by default): ジャンク, 傷あり, 海外版, オリパ, 空箱 and about 30 other listing
+  terms get a plain-English note, and warning terms give the panel an orange border.
 
 This is a rebuild of an earlier ChatGPT-made prototype whose source was lost. It keeps the same design (a Shortcuts
 action fed by Take Screenshot) and adds more languages, a history and a cleaner layout engine.
@@ -46,6 +56,8 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | `TextGeometry.swift` | Coordinate conversion, status-bar filter, joining wrapped lines into paragraphs |
 | `Translator.swift` | Apple's on-device Translation (language status and batch translation) |
 | `OverlayRenderer.swift` | Draws the English panels; long translations get a number and a footnote under the image |
+| `Prices.swift` | Finds prices in the text and fetches/caches exchange rates |
+| `ListingTerms.swift` | Japanese marketplace condition words and their meanings |
 | `ContentView.swift`, `ResultView.swift` | Setup screen, options, in-app test, history |
 | `HistoryStore.swift` | Optional on-device history of the last 30 translations |
 

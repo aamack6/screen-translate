@@ -1,6 +1,6 @@
 import Foundation
 
-/// Languages the app can read from a screenshot. Translations always go to English.
+/// Languages the app can read from a screenshot.
 enum SourceLanguage: String, CaseIterable, Identifiable, Codable {
     case japanese = "ja"
     case chineseSimplified = "zh-Hans"
@@ -34,6 +34,16 @@ enum SourceLanguage: String, CaseIterable, Identifiable, Codable {
     /// Japanese and Chinese don't put spaces between words; Korean does.
     var lineJoiner: String { self == .korean ? " " : "" }
 
+    /// The currency prices in this language are usually written in.
+    var homeCurrency: String {
+        switch self {
+        case .japanese: return "JPY"
+        case .chineseSimplified: return "CNY"
+        case .chineseTraditional: return "TWD"
+        case .korean: return "KRW"
+        }
+    }
+
     /// True when the text contains at least one character of this language's script.
     /// Used to leave English, numbers and symbols on the screenshot untouched.
     func matchesScript(_ text: String) -> Bool {
@@ -52,8 +62,70 @@ enum SourceLanguage: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// Languages the app translates into. All are handled by Apple's on-device Translation;
+/// a pair Apple doesn't support shows as "Not available" in the app.
+enum TargetLanguage: String, CaseIterable, Identifiable, Codable {
+    case english = "en"
+    case spanish = "es"
+    case french = "fr"
+    case german = "de"
+    case italian = "it"
+    case portuguese = "pt-BR"
+    case dutch = "nl"
+    case polish = "pl"
+    case turkish = "tr"
+    case indonesian = "id"
+    case vietnamese = "vi"
+    case thai = "th"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .english: return "English"
+        case .spanish: return "Spanish"
+        case .french: return "French"
+        case .german: return "German"
+        case .italian: return "Italian"
+        case .portuguese: return "Portuguese"
+        case .dutch: return "Dutch"
+        case .polish: return "Polish"
+        case .turkish: return "Turkish"
+        case .indonesian: return "Indonesian"
+        case .vietnamese: return "Vietnamese"
+        case .thai: return "Thai"
+        }
+    }
+
+    var localeLanguage: Locale.Language { Locale.Language(identifier: rawValue) }
+}
+
+/// Currencies prices can be converted into.
+enum DisplayCurrency: String, CaseIterable, Identifiable, Codable {
+    case usd = "USD"
+    case eur = "EUR"
+    case gbp = "GBP"
+    case cad = "CAD"
+    case aud = "AUD"
+    case nzd = "NZD"
+    case sgd = "SGD"
+    case hkd = "HKD"
+    case jpy = "JPY"
+
+    var id: String { rawValue }
+
+    func format(_ amount: Double) -> String {
+        amount.formatted(.currency(code: rawValue).precision(.fractionLength(rawValue == "JPY" ? 0 : 2)))
+    }
+}
+
 enum SettingsKey {
     static let sourceLanguage = "sourceLanguage"
+    static let targetLanguage = "targetLanguage"
+    static let convertPrices = "convertPrices"
+    static let displayCurrency = "displayCurrency"
+    static let extraCost = "extraCost"
+    static let flagListingTerms = "flagListingTerms"
     static let darkPanels = "darkPanels"
     static let appendFullText = "appendFullText"
     static let keepHistory = "keepHistory"
@@ -68,6 +140,10 @@ enum AppSettings {
         SourceLanguage(rawValue: defaults.string(forKey: SettingsKey.sourceLanguage) ?? "") ?? .japanese
     }
 
+    static var targetLanguage: TargetLanguage {
+        TargetLanguage(rawValue: defaults.string(forKey: SettingsKey.targetLanguage) ?? "") ?? .english
+    }
+
     static var keepHistory: Bool { defaults.bool(forKey: SettingsKey.keepHistory) }
 
     static var overlayOptions: OverlayOptions {
@@ -76,6 +152,25 @@ enum AppSettings {
             appendFullText: defaults.bool(forKey: SettingsKey.appendFullText)
         )
     }
+
+    /// Nil when price conversion is turned off.
+    static var priceOptions: PriceOptions? {
+        guard defaults.bool(forKey: SettingsKey.convertPrices) else { return nil }
+        return PriceOptions(
+            currency: DisplayCurrency(rawValue: defaults.string(forKey: SettingsKey.displayCurrency) ?? "") ?? .usd,
+            extraCost: max(defaults.double(forKey: SettingsKey.extraCost), 0)
+        )
+    }
+
+    /// On unless the user turned it off.
+    static var flagListingTerms: Bool { defaults.object(forKey: SettingsKey.flagListingTerms) as? Bool ?? true }
+}
+
+struct PriceOptions {
+    var currency: DisplayCurrency
+    /// Fees added to every price before converting (proxy service, domestic shipping),
+    /// in the screenshot's currency. 0 = none.
+    var extraCost: Double
 }
 
 struct OverlayOptions {

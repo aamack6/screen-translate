@@ -4,6 +4,11 @@ import Translation
 
 struct ContentView: View {
     @AppStorage(SettingsKey.sourceLanguage) private var source: SourceLanguage = .japanese
+    @AppStorage(SettingsKey.targetLanguage) private var target: TargetLanguage = .english
+    @AppStorage(SettingsKey.convertPrices) private var convertPrices = false
+    @AppStorage(SettingsKey.displayCurrency) private var currency: DisplayCurrency = .usd
+    @AppStorage(SettingsKey.extraCost) private var extraCost = 0.0
+    @AppStorage(SettingsKey.flagListingTerms) private var flagListingTerms = true
     @AppStorage(SettingsKey.darkPanels) private var darkPanels = false
     @AppStorage(SettingsKey.appendFullText) private var appendFullText = false
     @AppStorage(SettingsKey.keepHistory) private var keepHistory = false
@@ -11,6 +16,7 @@ struct ContentView: View {
     @State private var status: LanguageStatus?
     @State private var translationConfig: TranslationSession.Configuration?
     @State private var downloadError: String?
+    @State private var ratesUpdated: Date?
 
     @State private var pickerItem: PhotosPickerItem?
     @State private var isTranslating = false
@@ -24,6 +30,7 @@ struct ContentView: View {
             Form {
                 languageSection
                 setupSection
+                shoppingSection
                 optionsSection
                 testSection
                 Section {
@@ -33,7 +40,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("ScreenTranslate")
-            .task(id: source) { await refreshStatus() }
+            .task(id: "\(source.rawValue)>\(target.rawValue)") { await refreshStatus() }
             .translationTask(translationConfig) { session in
                 do {
                     try await session.prepareTranslation()
@@ -58,6 +65,11 @@ struct ContentView: View {
                     Text(language.displayName).tag(language)
                 }
             }
+            Picker("Translate to", selection: $target) {
+                ForEach(TargetLanguage.allCases) { language in
+                    Text(language.displayName).tag(language)
+                }
+            }
             statusRow
             if status == .needsDownload {
                 Button("Download languages") { downloadLanguages() }
@@ -68,7 +80,7 @@ struct ContentView: View {
         } header: {
             Text("Language")
         } footer: {
-            Text("Translations go to English. Approve Apple's language download once, and after that everything works offline.")
+            Text("Approve Apple's language download once for each pair, and after that translation works offline.")
         }
     }
 
@@ -109,6 +121,49 @@ struct ContentView: View {
         }
     }
 
+    private var shoppingSection: some View {
+        Section {
+            Toggle("Convert prices", isOn: $convertPrices)
+            if convertPrices {
+                Picker("Show prices in", selection: $currency) {
+                    ForEach(DisplayCurrency.allCases) { currency in
+                        Text(currency.rawValue).tag(currency)
+                    }
+                }
+                LabeledContent("Extra costs per item (\(source.homeCurrency))") {
+                    TextField("0", value: $extraCost, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 120)
+                }
+            }
+            if source == .japanese {
+                Toggle("Explain condition words", isOn: $flagListingTerms)
+            }
+        } header: {
+            Text("Shopping")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                if convertPrices {
+                    Text("Prices like ¥12,800 or 1万2000円 get an estimate in \(currency.rawValue) underneath. Extra costs, such as a proxy service fee or domestic shipping, are added to each price for a \"with fees\" total.")
+                    if let ratesUpdated {
+                        Text("Rates updated \(ratesUpdated.formatted(date: .abbreviated, time: .shortened)). [Rates by Exchange Rate API](https://www.exchangerate-api.com)")
+                    } else {
+                        Text("Rates download once and are reused for 12 hours. [Rates by Exchange Rate API](https://www.exchangerate-api.com)")
+                    }
+                }
+                if source == .japanese, flagListingTerms {
+                    Text("Words like ジャンク (junk), 傷あり (scratched) or 海外版 (overseas edition) get a plain-English note, and the panel gets an orange border.")
+                }
+            }
+        }
+        .task(id: "\(convertPrices)\(source.rawValue)\(currency.rawValue)") {
+            guard convertPrices else { return }
+            _ = await ExchangeRates.rate(from: source.homeCurrency, to: currency.rawValue)
+            ratesUpdated = ExchangeRates.lastUpdated(for: source.homeCurrency)
+        }
+    }
+
     private var optionsSection: some View {
         Section("Options") {
             Toggle("Dark translation panels", isOn: $darkPanels)
@@ -142,14 +197,14 @@ struct ContentView: View {
 
     private func refreshStatus() async {
         status = nil
-        status = await Translator.status(for: source)
+        status = await Translator.status(from: source, to: target)
     }
 
     private func downloadLanguages() {
-        if translationConfig?.source == source.localeLanguage {
+        if translationConfig?.source == source.localeLanguage, translationConfig?.target == target.localeLanguage {
             translationConfig?.invalidate()
         } else {
-            translationConfig = TranslationSession.Configuration(source: source.localeLanguage, target: Translator.target)
+            translationConfig = TranslationSession.Configuration(source: source.localeLanguage, target: target.localeLanguage)
         }
     }
 
@@ -164,7 +219,7 @@ struct ContentView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw ScreenTranslateError.unreadableImage
             }
-            let rendered = try await ScreenTranslator.translate(data, source: source, options: AppSettings.overlayOptions)
+            let rendered = try await ScreenTranslator.translate(data, settings: .current)
             if rendered.regions.isEmpty {
                 testError = "No \(source.displayName) text was found in that screenshot."
             }
