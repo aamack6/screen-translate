@@ -7,6 +7,7 @@ struct LiveView: View {
     @ObservedObject private var live = LiveTranslator.shared
     @ObservedObject private var store = Store.shared
     @State private var broadcastPicker = BroadcastPicker()
+    @AppStorage(LiveLayout.settingsKey) private var layout: LiveLayout = .screen
 
     var body: some View {
         Form {
@@ -40,6 +41,18 @@ struct LiveView: View {
                 Text("Start")
             } footer: {
                 Text("In the sharing sheet, pick ScreenTranslate Live, then Start Broadcast. To stop, tap the red indicator at the top of the screen, or come back here.")
+            }
+
+            Section {
+                Picker("Window shows", selection: $layout) {
+                    ForEach(LiveLayout.allCases) { layout in
+                        Text(layout.name).tag(layout)
+                    }
+                }
+            } footer: {
+                Text(layout == .screen
+                     ? "A small copy of your screen with each translation in its place. Pinch the window to about half the screen's width to read it."
+                     : "The translations as a list in a short strip, top to bottom.")
             }
 
             if !store.isPro {

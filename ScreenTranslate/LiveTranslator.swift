@@ -205,7 +205,12 @@ final class LiveTranslator: NSObject, ObservableObject {
         }
         let lines = ordered.compactMap { translations[$0.text] }
         let footer = missingPairs.isEmpty ? nil : "Download \(missingPairs.joined(separator: ", ")) in ScreenTranslate."
-        show(lines.isEmpty ? ["No foreign text on screen."] : lines, footer: footer)
+        if LiveLayout.current == .screen, let aspect = frame.aspect {
+            let placed = ordered.compactMap { block in translations[block.text].map { (rect: block.rect, text: $0) } }
+            enqueue(LivePanelRenderer.sampleBuffer(screen: placed, thumbnail: frame.thumbnail, aspect: aspect, footer: footer))
+        } else {
+            show(lines.isEmpty ? ["No foreign text on screen."] : lines, footer: footer)
+        }
     }
 
     private func showStatus() {
@@ -219,7 +224,11 @@ final class LiveTranslator: NSObject, ObservableObject {
     }
 
     private func show(_ lines: [String], footer: String?) {
-        guard let buffer = LivePanelRenderer.sampleBuffer(lines: lines, footer: footer) else { return }
+        enqueue(LivePanelRenderer.sampleBuffer(lines: lines, footer: footer))
+    }
+
+    private func enqueue(_ buffer: CMSampleBuffer?) {
+        guard let buffer else { return }
         let renderer = displayLayer.sampleBufferRenderer
         if renderer.status == .failed {
             renderer.flush()
@@ -266,6 +275,29 @@ extension LiveTranslator: AVPictureInPictureSampleBufferPlaybackDelegate {
 
 // MARK: - Drawing
 
+/// What the floating window shows.
+enum LiveLayout: String, CaseIterable, Identifiable {
+    /// A small faded copy of the screen with each translation where its text is.
+    case screen
+    /// The translations as a list, in a short strip.
+    case list
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .screen: return "Screen layout"
+        case .list: return "List"
+        }
+    }
+
+    static let settingsKey = "liveLayout"
+
+    static var current: LiveLayout {
+        LiveLayout(rawValue: UserDefaults.standard.string(forKey: settingsKey) ?? "") ?? .screen
+    }
+}
+
 /// Draws the translations as a "video frame" for the floating window.
 enum LivePanelRenderer {
     /// A wide 3:1 strip, so the window covers as little of the screen as iOS allows. Users can
@@ -311,6 +343,67 @@ enum LivePanelRenderer {
             }
             text.draw(with: CGRect(x: inset, y: inset, width: width, height: available), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
         }
+    }
+
+    /// Draws a faded copy of the screen with each translation on a panel where its text is.
+    /// Translations are longer than the Japanese they replace, so a panel may grow downward,
+    /// and its text shrinks until it fits.
+    static func sampleBuffer(screen blocks: [(rect: CGRect, text: String)], thumbnail: Data?, aspect: Double, footer: String?) -> CMSampleBuffer? {
+        let width: CGFloat = 480
+        let canvas = CGSize(width: width, height: (width * CGFloat(min(max(aspect, 0.4), 2.5)) / 2).rounded() * 2)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
+            UIColor(white: 0.08, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: canvas))
+            if let thumbnail, let screen = UIImage(data: thumbnail) {
+                screen.draw(in: CGRect(origin: .zero, size: canvas), blendMode: .normal, alpha: 0.4)
+            }
+
+            for block in blocks {
+                var panel = CGRect(
+                    x: block.rect.minX * canvas.width,
+                    y: block.rect.minY * canvas.height,
+                    width: block.rect.width * canvas.width,
+                    height: block.rect.height * canvas.height
+                ).insetBy(dx: -2, dy: -1)
+                panel.size.width = min(max(panel.width, 70), canvas.width - max(panel.minX, 0))
+                let textWidth = panel.width - 4
+
+                var fontSize = min(max(panel.height * 0.75, 9), 20)
+                var text = panelText(block.text, fontSize: fontSize)
+                while fontSize > 7, height(of: text, width: textWidth) > max(panel.height, fontSize * 2.6) {
+                    fontSize -= 1
+                    text = panelText(block.text, fontSize: fontSize)
+                }
+                panel.size.height = max(panel.height, min(height(of: text, width: textWidth) + 2, canvas.height - panel.minY))
+
+                UIColor(white: 1, alpha: 0.93).setFill()
+                UIBezierPath(roundedRect: panel, cornerRadius: 3).fill()
+                text.draw(with: panel.insetBy(dx: 2, dy: 1), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+            }
+
+            if let footer {
+                let footerText = NSAttributedString(string: footer, attributes: [
+                    .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+                    .foregroundColor: UIColor.systemOrange,
+                ])
+                let band = CGRect(x: 0, y: canvas.height - 44, width: canvas.width, height: 44)
+                UIColor(white: 0.08, alpha: 0.9).setFill()
+                context.fill(band)
+                footerText.draw(with: band.insetBy(dx: 12, dy: 6), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+            }
+        }
+        guard let cgImage = image.cgImage, let pixelBuffer = pixelBuffer(from: cgImage) else { return nil }
+        return sampleBuffer(from: pixelBuffer)
+    }
+
+    private static func panelText(_ text: String, fontSize: CGFloat) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: UIColor.black,
+        ])
     }
 
     private static func attributed(_ lines: [String], fontSize: CGFloat) -> NSAttributedString {

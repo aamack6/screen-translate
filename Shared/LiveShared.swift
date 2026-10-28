@@ -113,6 +113,10 @@ struct LiveBlock: Codable, Hashable {
 struct LiveFrame: Codable {
     var date: Date
     var blocks: [LiveBlock]
+    /// A small JPEG of the screen, for the floating window's screen layout.
+    var thumbnail: Data? = nil
+    /// The screen's height divided by its width.
+    var aspect: Double? = nil
 }
 
 struct LiveState: Codable {

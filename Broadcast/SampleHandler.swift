@@ -1,4 +1,6 @@
+import CoreImage
 import CoreMedia
+import ImageIO
 import Network
 import ReplayKit
 
@@ -21,6 +23,8 @@ final class SampleHandler: RPBroadcastSampleHandler {
     private var link: LiveLink?
     /// Only touched on `queue`.
     private var lastTexts: [String] = []
+    /// Only touched on `queue`.
+    private lazy var imageContext = CIContext()
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         linkQueue.async { self.connectIfNeeded() }
@@ -104,8 +108,25 @@ final class SampleHandler: RPBroadcastSampleHandler {
         guard texts != lastTexts else { return }
         lastTexts = texts
 
-        let message = LiveMessage(frame: LiveFrame(date: Date(), blocks: blocks))
+        let (thumbnail, aspect) = thumbnail(of: pixelBuffer, orientation: orientation)
+        let message = LiveMessage(frame: LiveFrame(date: Date(), blocks: blocks, thumbnail: thumbnail, aspect: aspect))
         linkQueue.async { self.link?.send(message) }
+    }
+
+    /// A small, low-quality JPEG of the screen (about 20 KB), so the app can show where each
+    /// translation belongs.
+    private func thumbnail(of pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation) -> (Data?, Double?) {
+        let image = CIImage(cvPixelBuffer: pixelBuffer).oriented(orientation)
+        let extent = image.extent
+        guard extent.width > 0 else { return (nil, nil) }
+        let scale = 320 / extent.width
+        let small = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let data = imageContext.jpegRepresentation(
+            of: small,
+            colorSpace: CGColorSpaceCreateDeviceRGB(),
+            options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.4]
+        )
+        return (data, Double(extent.height / extent.width))
     }
 
     /// Which way the screen is turned (portrait, or landscape in a game or video).
