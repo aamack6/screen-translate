@@ -41,6 +41,7 @@ struct ContentView: View {
         NavigationStack {
             Form {
                 translateSection
+                liveSection
                 proSection
                 languageSection
                 setupSection
@@ -69,6 +70,7 @@ struct ContentView: View {
                 }
             }
             .task { await store.load() }
+            .onChange(of: "\(sourceSetting)>\(target.rawValue)") { LiveTranslator.shared.writeConfig() }
             .onChange(of: scenePhase) { _, phase in
                 // The Shortcuts action may have used free translations while the app was closed.
                 if phase == .active { remainingFree = Usage.remainingToday }
@@ -124,11 +126,23 @@ struct ContentView: View {
         }
     }
 
+    private var liveSection: some View {
+        Section {
+            NavigationLink {
+                LiveView()
+            } label: {
+                Label("Live mode", systemImage: "pip")
+            }
+        } footer: {
+            Text("A floating window that keeps translating your screen in any app, as you scroll.")
+        }
+    }
+
     @ViewBuilder
     private var proSection: some View {
         Section {
             if store.isPro {
-                Label("Pro: unlimited translations", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+                Label("Pro: unlimited translations and live mode", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
             } else {
                 Text("\(remainingFree) of \(Usage.freeTranslationsPerDay) free translations left today")
                 if let product = store.proProduct {

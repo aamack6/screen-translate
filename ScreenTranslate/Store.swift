@@ -110,6 +110,26 @@ enum Usage {
         defaults.set(used + 1, forKey: countKey)
     }
 
+    // MARK: Live mode
+
+    static let freeLiveMinutesPerDay = 5
+
+    private static let liveDayKey = "usage.live.day"
+    private static let liveSecondsKey = "usage.live.seconds"
+
+    static var liveSecondsRemainingToday: Double {
+        let defaults = UserDefaults.standard
+        let used = defaults.string(forKey: liveDayKey) == today ? defaults.double(forKey: liveSecondsKey) : 0
+        return max(Double(freeLiveMinutesPerDay * 60) - used, 0)
+    }
+
+    static func recordLiveSeconds(_ seconds: Double) {
+        let used = Double(freeLiveMinutesPerDay * 60) - liveSecondsRemainingToday
+        let defaults = UserDefaults.standard
+        defaults.set(today, forKey: liveDayKey)
+        defaults.set(used + seconds, forKey: liveSecondsKey)
+    }
+
     private static var today: String {
         Date().formatted(.iso8601.year().month().day())
     }

@@ -34,8 +34,11 @@ action fed by Take Screenshot) and adds the features above and a cleaner layout 
 ## Build and install on your iPhone
 
 1. Clone this repo on the Mac and open `ScreenTranslate.xcodeproj`.
-2. Click the ScreenTranslate project, then the ScreenTranslate target, then **Signing & Capabilities**. Choose your
-   team. If Xcode says the bundle ID is taken, change `com.aamack6.ScreenTranslate` to something unique.
+2. Click the ScreenTranslate project, then **Signing & Capabilities**, and choose your team for **both** targets:
+   ScreenTranslate and ScreenTranslateLive (the live mode extension). Both use the App Group
+   `group.com.aamack6.ScreenTranslate`; if Xcode flags it, click the refresh button under App Groups. If the bundle
+   ID is taken, change `com.aamack6.ScreenTranslate` everywhere it appears (both targets, the App Group in both
+   `Config/*.entitlements` files, and `LiveShared.swift`).
 3. Plug in the iPhone (or pick it from the device list over Wi-Fi), choose it as the run destination, and press Run.
 4. The first time, iOS asks you to trust the developer: Settings › General › VPN & Device Management.
 
@@ -51,6 +54,13 @@ If the project won't open, regenerate it with [XcodeGen](https://github.com/yona
 3. Put it on a button: Settings › Action Button › Shortcut (iPhone 15 Pro and newer), or on any iPhone
    Settings › Accessibility › Touch › Back Tap › Double Tap, or a Shortcut control in Control Center.
 4. Open any app with foreign text and press the button.
+
+### Live mode
+
+Open ScreenTranslate › **Live mode**. Tap **Start screen sharing**, pick **ScreenTranslate Live**, then
+**Start Broadcast**. Tap **Show the floating window** and switch to any app: the window keeps translating what's on
+screen about once a second. Pause from the window's play/pause button; stop sharing from the red indicator at the
+top of the screen.
 
 Tip: share the finished shortcut (Share › Copy iCloud Link) and paste the link into `AppLinks.readyMadeShortcut`
 in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortcut** button.
@@ -71,6 +81,9 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | `ContentView.swift`, `ResultView.swift` | Photo and camera translation, settings, results (copy, read aloud, share), history |
 | `HistoryStore.swift` | Optional on-device history of the last 30 translations |
 | `Store.swift` | Free daily allowance and the one-time Pro unlock (StoreKit 2) |
+| `Broadcast/SampleHandler.swift` | Live mode extension: reads the shared screen about once a second and passes on foreign text |
+| `LiveTranslator.swift`, `LiveView.swift` | Live mode in the app: translates that text and draws it in a Picture-in-Picture window |
+| `Shared/` | Code used by both the app and the extension (languages, text reading, live mode file exchange) |
 
 Text already in the target language, numbers and symbols stay as they are.
 
@@ -79,5 +92,10 @@ Text already in the target language, numbers and symbols stay as they are.
 This code was written without a Mac, so it has not been compiled. Expect a few small compile fixes in Xcode the
 first time. Known limits: vertical text (manga) is read poorly by Vision; with automatic detection Vision picks one main language per image, so a second script on the same screen may be read less accurately; the Shortcuts action can't show Apple's
 language download prompt, which is why the app has a Download button.
+
+Live mode risks to check on a real iPhone: the extension has about 50 MB of memory, and if Vision's accurate reader
+goes over it, iOS ends the broadcast (fix: read a scaled-down frame); the floating window needs the app to keep
+running in the background, which PiP plus the audio background mode should allow; App Review may ask why the app
+declares background audio (answer: Picture in Picture for live translation).
 
 See [docs/APP_STORE.md](docs/APP_STORE.md) for the path to selling it.
