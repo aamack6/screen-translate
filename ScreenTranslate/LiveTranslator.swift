@@ -139,6 +139,16 @@ final class LiveTranslator: NSObject, ObservableObject {
         }
     }
 
+    /// Draws the window again after the layout setting changed.
+    func redraw() {
+        if isBroadcasting, !isPaused, let latestFrame {
+            lastFrameDate = nil
+            frameArrived(latestFrame)
+        } else {
+            showStatus()
+        }
+    }
+
     func toggleFloating() {
         guard let pip else { return }
         if pip.isPictureInPictureActive {
@@ -223,8 +233,16 @@ final class LiveTranslator: NSObject, ObservableObject {
         }
     }
 
+    /// Shows a message. In the screen layout it's drawn in the same screen shape as the
+    /// translations, so the window doesn't change shape when they arrive.
     private func show(_ lines: [String], footer: String?) {
-        enqueue(LivePanelRenderer.sampleBuffer(lines: lines, footer: footer))
+        if LiveLayout.current == .screen {
+            let bounds = UIScreen.main.bounds
+            let aspect = latestFrame?.aspect ?? Double(max(bounds.height, 1) / max(bounds.width, 1))
+            enqueue(LivePanelRenderer.sampleBuffer(screen: [], thumbnail: latestFrame?.thumbnail, aspect: aspect, footer: footer, message: lines.joined(separator: "\n")))
+        } else {
+            enqueue(LivePanelRenderer.sampleBuffer(lines: lines, footer: footer))
+        }
     }
 
     private func enqueue(_ buffer: CMSampleBuffer?) {
@@ -350,7 +368,7 @@ enum LivePanelRenderer {
     /// Draws a faded copy of the screen with each translation on a panel where its text is.
     /// Translations are longer than the Japanese they replace, so a panel may grow downward,
     /// and its text shrinks until it fits.
-    static func sampleBuffer(screen blocks: [(rect: CGRect, text: String)], thumbnail: Data?, aspect: Double, footer: String?) -> CMSampleBuffer? {
+    static func sampleBuffer(screen blocks: [(rect: CGRect, text: String)], thumbnail: Data?, aspect: Double, footer: String?, message: String? = nil) -> CMSampleBuffer? {
         // Few pixels on purpose, as with the list: the window scales the frame down, and text has
         // to stay readable at half the screen's width.
         let width: CGFloat = 300
@@ -388,6 +406,19 @@ enum LivePanelRenderer {
                 UIColor(white: 1, alpha: 0.93).setFill()
                 UIBezierPath(roundedRect: panel, cornerRadius: 3).fill()
                 text.draw(with: panel.insetBy(dx: 2, dy: 1), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+            }
+
+            if let message {
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.alignment = .center
+                let messageText = NSAttributedString(string: message, attributes: [
+                    .font: UIFont.systemFont(ofSize: 20, weight: .semibold),
+                    .foregroundColor: UIColor.white,
+                    .paragraphStyle: paragraph,
+                ])
+                let textWidth = canvas.width - 32
+                let textHeight = height(of: messageText, width: textWidth)
+                messageText.draw(with: CGRect(x: 16, y: (canvas.height - textHeight) / 2, width: textWidth, height: textHeight), options: .usesLineFragmentOrigin, context: nil)
             }
 
             if let footer {

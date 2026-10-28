@@ -70,6 +70,7 @@ struct LiveView: View {
             }
         }
         .navigationTitle("Live mode")
+        .onChange(of: layout) { live.redraw() }
         .onAppear { live.prepare() }
         .background(BroadcastPickerHost(picker: broadcastPicker).frame(width: 1, height: 1).opacity(0.01))
     }
