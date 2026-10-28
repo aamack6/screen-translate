@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var joinItems: [PhotosPickerItem] = []
     @State private var showCamera = false
+    @State private var showLiveCamera = false
     @State private var isTranslating = false
     @State private var shownResult: ShownResult?
     @State private var translateError: String?
@@ -82,6 +83,9 @@ struct ContentView: View {
                 // The Shortcuts action may have used free translations while the app was closed.
                 if phase == .active { remainingFree = Usage.remainingToday }
             }
+            .fullScreenCover(isPresented: $showLiveCamera) {
+                LiveCameraView()
+            }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { data in
                     showCamera = false
@@ -108,8 +112,18 @@ struct ContentView: View {
                 Button {
                     showCamera = true
                 } label: {
-                    Label("Translate with the camera", systemImage: "camera")
+                    Label("Translate a photo from the camera", systemImage: "camera")
                 }
+                Button {
+                    showLiveCamera = true
+                } label: {
+                    Label("Live camera", systemImage: "camera.viewfinder")
+                }
+            }
+            NavigationLink {
+                BrowserView()
+            } label: {
+                Label("Translate a website", systemImage: "safari")
             }
             if isTranslating {
                 ProgressView("Reading and translating…")

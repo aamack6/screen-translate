@@ -232,22 +232,7 @@ final class LiveTranslator: NSObject, ObservableObject {
 
     /// "≈ $107.20" for each block with a foreign price, when price conversion is on.
     private func priceNotes(for blocks: [LiveBlock]) async -> [String: String] {
-        guard let options = AppSettings.priceOptions else { return [:] }
-        var rates: [String: Double] = [:]
-        var notes: [String: String] = [:]
-        for block in blocks {
-            var blockNotes: [String] = []
-            for price in PriceParser.prices(in: block.text, language: block.language) where price.currency != options.currency {
-                if rates[price.currency] == nil {
-                    rates[price.currency] = await ExchangeRates.rate(from: price.currency, to: options.currency)
-                }
-                if let rate = rates[price.currency] {
-                    blockNotes.append(ScreenTranslator.priceNote(price.amount * rate, options: options))
-                }
-            }
-            if !blockNotes.isEmpty { notes[block.text] = blockNotes.joined(separator: ", ") }
-        }
-        return notes
+        await TextTranslator.priceNotes(for: blocks.map { ($0.text, $0.language) })
     }
 
     private func showStatus() {

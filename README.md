@@ -75,6 +75,10 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | `LanguageDetector.swift` | Decides per line whether to translate and from which language |
 | `TextGeometry.swift` | Coordinate conversion, status-bar filter, joining wrapped lines into paragraphs |
 | `Translator.swift` | Apple's on-device Translation (language status and batch translation), with a cache of recent translations |
+| `TextTranslator.swift` | Translates loose text (camera, web pages) with language detection and price notes |
+| `LiveCameraView.swift` | Live camera with translations overlaid on the text as the camera moves |
+| `BrowserView.swift` | Built-in browser that replaces page text with translations in place |
+| `WordList.swift` | The user's own fixed translations, applied with every engine |
 | `OnlineTranslator.swift` | Optional DeepL or Google engine with the user's own API key (Pro), falling back to Apple's |
 | `OverlayRenderer.swift` | Draws the translation panels; long translations get a number and a footnote under the image |
 | `Prices.swift` | Finds prices in about 20 currencies and fetches/caches exchange rates |

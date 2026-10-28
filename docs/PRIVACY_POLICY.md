@@ -7,6 +7,9 @@ ScreenTranslate does not collect, store on a server, or share any personal data.
 - If you choose an online translation engine (DeepL or Google) and enter your own API key, the text read from the
   screen, but never the image, is sent to that service to be translated, under its own privacy policy. The key is
   kept in your device's Keychain. With the default engine, nothing leaves your device.
+- The live camera reads text on your device and keeps no photos or video. The built-in browser loads the websites
+  you open like any browser; the text it translates is handled the same way as screenshot text above.
+- Your word list is stored only on your device.
 - Screenshots are not saved to your photo library unless you choose to save or share a result.
 - If you turn on History, recent translations are kept in the app's private storage on your device. Turning it off
   or tapping Clear deletes them. Deleting the app deletes them too.
