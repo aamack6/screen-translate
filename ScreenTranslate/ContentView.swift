@@ -409,6 +409,7 @@ struct ContentView: View {
 
     private var optionsSection: some View {
         Section("Options") {
+            NavigationLink("My word list") { WordListView() }
             Toggle("Dark translation panels", isOn: $darkPanels)
             Toggle("List all translations under the image", isOn: $appendFullText)
             Toggle("Keep history on this iPhone", isOn: $keepHistory)

@@ -49,12 +49,15 @@ enum Translator {
         let cache = TranslationCache(source: source, target: target, engine: engine)
         var known = cache.load()
         for text in texts {
-            if let fixed = ButtonLabels.translation(of: text, from: source, to: target) { known[text] = fixed }
+            if let fixed = WordList.exactMatch(for: text) ?? ButtonLabels.translation(of: text, from: source, to: target) {
+                known[text] = fixed
+            }
         }
         let new = Array(Set(texts.filter { known[$0] == nil }))
         if !new.isEmpty {
             let context = String(texts.joined(separator: "\n").prefix(2000))
-            let translated = try await translateWithEngine(new, from: source, to: target, engine: engine, context: context)
+            // The user's own words go in already translated; engines leave them as they are.
+            let translated = try await translateWithEngine(new.map(WordList.substitute), from: source, to: target, engine: engine, context: context)
             for (original, translation) in zip(new, translated) {
                 known[original] = translation
             }

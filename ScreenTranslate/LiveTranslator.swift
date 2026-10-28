@@ -213,14 +213,41 @@ final class LiveTranslator: NSObject, ObservableObject {
         let ordered = frame.blocks.sorted {
             abs($0.rect.minY - $1.rect.minY) < 0.01 ? $0.rect.minX < $1.rect.minX : $0.rect.minY < $1.rect.minY
         }
-        let lines = ordered.compactMap { translations[$0.text] }
+        let prices = await priceNotes(for: ordered)
+        guard !Task.isCancelled else { return }
+        func shown(_ block: LiveBlock) -> String? {
+            guard let translation = translations[block.text] else { return nil }
+            guard let note = prices[block.text] else { return translation }
+            return "\(translation) (\(note))"
+        }
+        let lines = ordered.compactMap(shown)
         let footer = missingPairs.isEmpty ? nil : "Download \(missingPairs.joined(separator: ", ")) in ScreenTranslate."
         if LiveLayout.current == .screen, let aspect = frame.aspect {
-            let placed = ordered.compactMap { block in translations[block.text].map { (rect: block.rect, text: $0) } }
+            let placed = ordered.compactMap { block in shown(block).map { (rect: block.rect, text: $0) } }
             enqueue(LivePanelRenderer.sampleBuffer(screen: placed, thumbnail: frame.thumbnail, aspect: aspect, footer: footer))
         } else {
             show(lines.isEmpty ? ["No foreign text on screen."] : lines, footer: footer)
         }
+    }
+
+    /// "≈ $107.20" for each block with a foreign price, when price conversion is on.
+    private func priceNotes(for blocks: [LiveBlock]) async -> [String: String] {
+        guard let options = AppSettings.priceOptions else { return [:] }
+        var rates: [String: Double] = [:]
+        var notes: [String: String] = [:]
+        for block in blocks {
+            var blockNotes: [String] = []
+            for price in PriceParser.prices(in: block.text, language: block.language) where price.currency != options.currency {
+                if rates[price.currency] == nil {
+                    rates[price.currency] = await ExchangeRates.rate(from: price.currency, to: options.currency)
+                }
+                if let rate = rates[price.currency] {
+                    blockNotes.append(ScreenTranslator.priceNote(price.amount * rate, options: options))
+                }
+            }
+            if !blockNotes.isEmpty { notes[block.text] = blockNotes.joined(separator: ", ") }
+        }
+        return notes
     }
 
     private func showStatus() {

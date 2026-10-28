@@ -223,7 +223,7 @@ enum ScreenTranslator {
     }
 
     /// "≈ $86.40" or, with extra costs set, "≈ $86.40 · $92.40 with fees".
-    private static func priceNote(_ converted: Double, options: PriceOptions) -> String {
+    static func priceNote(_ converted: Double, options: PriceOptions) -> String {
         let text = "≈ \(DisplayCurrency.format(converted, code: options.currency))"
         guard options.extraCost > 0 else { return text }
         return "\(text) · \(DisplayCurrency.format(converted + options.extraCost, code: options.currency)) with fees"
