@@ -14,7 +14,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aamack6.ScreenTranslate
-        CODE_SIGN_ENTITLEMENTS: Config/ScreenTranslate.entitlements
         INFOPLIST_FILE: Config/ScreenTranslate-Info.plist
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
@@ -43,5 +42,4 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Config/ScreenTranslateLive-Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: ScreenTranslate Live
-        CODE_SIGN_ENTITLEMENTS: Config/ScreenTranslateLive.entitlements
         APPLICATION_EXTENSION_API_ONLY: YES

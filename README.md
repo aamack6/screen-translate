@@ -35,10 +35,9 @@ action fed by Take Screenshot) and adds the features above and a cleaner layout 
 
 1. Clone this repo on the Mac and open `ScreenTranslate.xcodeproj`.
 2. Click the ScreenTranslate project, then **Signing & Capabilities**, and choose your team for **both** targets:
-   ScreenTranslate and ScreenTranslateLive (the live mode extension). Both use the App Group
-   `group.com.aamack6.ScreenTranslate`; if Xcode flags it, click the refresh button under App Groups. If the bundle
-   ID is taken, change `com.aamack6.ScreenTranslate` everywhere it appears (both targets, the App Group in both
-   `Config/*.entitlements` files, and `LiveShared.swift`).
+   ScreenTranslate and ScreenTranslateLive (the live mode extension). No special capabilities are needed, so a free
+   Apple ID works, live mode included: the extension talks to the app over the phone's loopback connection. If the
+   bundle ID is taken, change `com.aamack6.ScreenTranslate` everywhere it appears (both targets and `LiveShared.swift`).
 3. Plug in the iPhone (or pick it from the device list over Wi-Fi), choose it as the run destination, and press Run.
 4. The first time, iOS asks you to trust the developer: Settings › General › VPN & Device Management.
 

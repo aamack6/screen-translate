@@ -1,5 +1,6 @@
 import AVKit
 import CoreMedia
+import Network
 import UIKit
 
 /// Live mode, app side. The broadcast extension sends the foreign text on screen; this translates
@@ -25,25 +26,83 @@ final class LiveTranslator: NSObject, ObservableObject {
     private var lastFrameDate: Date?
     private var lastFrameArrival: Date?
     private var work: Task<Void, Never>?
+    private var listener: NWListener?
+    /// The connection from the broadcast extension, while it runs.
+    private var link: LiveLink?
 
     private override init() {
         super.init()
-        let center = CFNotificationCenterGetDarwinNotifyCenter()
-        let observer = Unmanaged.passUnretained(self).toOpaque()
-        for name in [LiveShared.frameNotification, LiveShared.stateNotification] {
-            CFNotificationCenterAddObserver(center, observer, liveNotificationCallback, name as CFString, nil, .deliverImmediately)
-        }
-        isBroadcasting = LiveShared.read(LiveState.self, from: LiveShared.stateURL)?.isBroadcasting ?? false
+        listen()
     }
 
     /// Tells the extension which languages to read. Called whenever they change in the app.
     func writeConfig() {
-        LiveShared.write(LiveConfig.current, to: LiveShared.configURL)
+        link?.send(LiveMessage(config: LiveConfig.current))
+    }
+
+    // MARK: - Connection to the extension
+
+    /// Waits for the broadcast extension on the loopback interface. iOS may stop the listener
+    /// while the app is in the background without the floating window; `prepare()` restarts it.
+    private func listen() {
+        guard listener == nil else { return }
+        let parameters = NWParameters.tcp
+        parameters.requiredInterfaceType = .loopback
+        parameters.allowLocalEndpointReuse = true
+        guard let port = NWEndpoint.Port(rawValue: LiveShared.port),
+              let listener = try? NWListener(using: parameters, on: port) else { return }
+        listener.newConnectionHandler = { [weak self] connection in
+            MainActor.assumeIsolated { self?.accept(connection) }
+        }
+        listener.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .failed, .cancelled:
+                MainActor.assumeIsolated {
+                    self?.listener?.cancel()
+                    self?.listener = nil
+                }
+            default: break
+            }
+        }
+        self.listener = listener
+        listener.start(queue: .main)
+    }
+
+    private func accept(_ connection: NWConnection) {
+        link?.cancel()
+        let link = LiveLink(connection, queue: .main)
+        link.onMessage = { [weak self] message in
+            MainActor.assumeIsolated { self?.received(message) }
+        }
+        link.onClose = { [weak self, weak link] in
+            MainActor.assumeIsolated {
+                guard let self, self.link === link else { return }
+                self.link = nil
+                self.isBroadcasting = false
+                self.lastFrameArrival = nil
+                self.showStatus()
+            }
+        }
+        self.link = link
+        link.start()
+        link.send(LiveMessage(config: LiveConfig.current))
+    }
+
+    private func received(_ message: LiveMessage) {
+        if let state = message.state {
+            isBroadcasting = state.isBroadcasting
+            lastFrameArrival = nil
+            showStatus()
+        }
+        if let frame = message.frame {
+            frameArrived(frame)
+        }
     }
 
     /// Sets up the floating window. Call when the live screen appears; PiP can only start from a
     /// layer that's on screen.
     func prepare() {
+        listen()
         writeConfig()
         guard pip == nil, AVPictureInPictureController.isPictureInPictureSupported() else { return }
 
@@ -77,18 +136,8 @@ final class LiveTranslator: NSObject, ObservableObject {
 
     // MARK: - Updates
 
-    fileprivate func notificationArrived(_ name: String) {
-        if name == LiveShared.stateNotification {
-            isBroadcasting = LiveShared.read(LiveState.self, from: LiveShared.stateURL)?.isBroadcasting ?? false
-            lastFrameArrival = nil
-            showStatus()
-        } else {
-            frameArrived()
-        }
-    }
-
-    private func frameArrived() {
-        guard !isPaused, let frame = LiveShared.read(LiveFrame.self, from: LiveShared.frameURL), frame.date != lastFrameDate else { return }
+    private func frameArrived(_ frame: LiveFrame) {
+        guard !isPaused, frame.date != lastFrameDate else { return }
         lastFrameDate = frame.date
         isBroadcasting = true
 
@@ -164,14 +213,6 @@ final class LiveTranslator: NSObject, ObservableObject {
     }
 }
 
-/// Darwin notifications carry no data and need a plain C function, so this hops back to the
-/// shared translator by its pointer.
-private let liveNotificationCallback: CFNotificationCallback = { _, observer, name, _, _ in
-    guard let observer, let name = name.map({ $0.rawValue as String }) else { return }
-    let translator = Unmanaged<LiveTranslator>.fromOpaque(observer).takeUnretainedValue()
-    Task { @MainActor in translator.notificationArrived(name) }
-}
-
 // MARK: - Picture in Picture
 
 extension LiveTranslator: AVPictureInPictureControllerDelegate {
@@ -214,8 +255,9 @@ extension LiveTranslator: AVPictureInPictureSampleBufferPlaybackDelegate {
 
 /// Draws the translations as a "video frame" for the floating window.
 enum LivePanelRenderer {
-    /// Portrait 3:4, so the window sits comfortably beside content. Users can pinch it larger.
-    static let size = CGSize(width: 480, height: 640)
+    /// Wide 16:9, like a video, so the window is a short strip that covers little of the screen.
+    /// Users can pinch it larger.
+    static let size = CGSize(width: 640, height: 360)
 
     static func sampleBuffer(lines: [String], footer: String?) -> CMSampleBuffer? {
         guard let image = render(lines: lines, footer: footer).cgImage,
@@ -231,26 +273,26 @@ enum LivePanelRenderer {
             UIColor(white: 0.08, alpha: 1).setFill()
             context.fill(CGRect(origin: .zero, size: size))
 
-            let inset: CGFloat = 20
+            let inset: CGFloat = 16
             let width = size.width - inset * 2
             var bottom = size.height - inset
             if let footer {
                 let footerText = NSAttributedString(string: footer, attributes: [
-                    .font: UIFont.systemFont(ofSize: 18, weight: .medium),
+                    .font: UIFont.systemFont(ofSize: 16, weight: .medium),
                     .foregroundColor: UIColor.systemOrange,
                 ])
                 let height = footerText.boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, context: nil).height
                 bottom -= ceil(height)
                 footerText.draw(with: CGRect(x: inset, y: bottom, width: width, height: height), options: .usesLineFragmentOrigin, context: nil)
-                bottom -= 12
+                bottom -= 8
             }
 
             // Shrink the text until everything fits, down to a size that's still readable;
             // past that, the lowest lines are cut.
             let available = bottom - inset
-            var fontSize: CGFloat = 30
+            var fontSize: CGFloat = 26
             var text = attributed(lines, fontSize: fontSize)
-            while fontSize > 18, height(of: text, width: width) > available {
+            while fontSize > 16, height(of: text, width: width) > available {
                 fontSize -= 2
                 text = attributed(lines, fontSize: fontSize)
             }
