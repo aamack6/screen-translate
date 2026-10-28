@@ -300,11 +300,11 @@ enum LiveLayout: String, CaseIterable, Identifiable {
 
 /// Draws the translations as a "video frame" for the floating window.
 enum LivePanelRenderer {
-    /// A wide 3:1 strip, so the window covers as little of the screen as iOS allows. Users can
+    /// A wide 9:4 strip, so the window covers little of the screen but fits a few lines. Users can
     /// pinch it larger, or swipe it to the edge of the screen to tuck it away.
     /// It's drawn at a low resolution on purpose: the window scales the frame to fit, so fewer
     /// pixels mean larger text.
-    static let size = CGSize(width: 450, height: 150)
+    static let size = CGSize(width: 450, height: 200)
 
     static func sampleBuffer(lines: [String], footer: String?) -> CMSampleBuffer? {
         guard let image = render(lines: lines, footer: footer).cgImage,
