@@ -23,7 +23,11 @@ enum Translator {
     /// follows straight after doesn't wait for it. Fails quietly if the pair isn't downloaded.
     static func warmUp(from source: AppLanguage, to target: AppLanguage) async {
         guard source != target else { return }
-        _ = try? await translate(["OK"], from: source, to: target)
+        await withTaskGroup(of: Void.self) { group in
+            for lane in 0..<SessionCache.lanes {
+                group.addTask { _ = try? await translate(["OK"], from: source, to: target, lane: lane) }
+            }
+        }
     }
 
     /// Warms up the language the user most likely reads next: the chosen one, or with automatic
@@ -33,13 +37,34 @@ enum Translator {
         await warmUp(from: source, to: AppSettings.targetLanguage)
     }
 
-    /// Translates the texts in one batch and returns them in the same order.
+    /// Translates the texts and returns them in the same order. Larger batches are split across a
+    /// few sessions running at once, since one session works through its batch one text at a time.
     /// The languages must already be downloaded (see `ContentView`'s Download button),
     /// because the Shortcuts action can't show Apple's download prompt.
     static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
+        let laneCount = min(SessionCache.lanes, max(1, texts.count / 3))
+        guard laneCount > 1 else { return try await translate(texts, from: source, to: target, lane: 0) }
 
-        let session = await SessionCache.shared.session(from: source, to: target)
+        // Deal texts out round-robin so each lane gets a similar mix of long and short ones.
+        let lanes = (0..<laneCount).map { lane in Array(stride(from: lane, to: texts.count, by: laneCount)) }
+        var results = texts
+        try await withThrowingTaskGroup(of: (Int, [String]).self) { group in
+            for (lane, indices) in lanes.enumerated() {
+                let laneTexts = indices.map { texts[$0] }
+                group.addTask { (lane, try await translate(laneTexts, from: source, to: target, lane: lane)) }
+            }
+            for try await (lane, translated) in group {
+                for (position, index) in lanes[lane].enumerated() {
+                    results[index] = translated[position]
+                }
+            }
+        }
+        return results
+    }
+
+    private static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage, lane: Int) async throws -> [String] {
+        let session = await SessionCache.shared.session(from: source, to: target, lane: lane)
         let requests = texts.enumerated().map { index, text in
             TranslationSession.Request(sourceText: text, clientIdentifier: String(index))
         }
@@ -61,23 +86,27 @@ enum Translator {
     }
 }
 
-/// Keeps one translation session per language pair, so repeated translations don't pay the
-/// start-up cost again (other apps get slower with every use; this keeps the speed steady).
+/// Keeps translation sessions per language pair, so repeated translations don't pay the start-up
+/// cost again (other apps get slower with every use; this keeps the speed steady).
 actor SessionCache {
     static let shared = SessionCache()
+    /// Sessions per pair that translate side by side.
+    static let lanes = 3
 
     private var sessions: [String: TranslationSession] = [:]
 
-    func session(from source: AppLanguage, to target: AppLanguage) -> TranslationSession {
-        let key = "\(source.rawValue)>\(target.rawValue)"
+    func session(from source: AppLanguage, to target: AppLanguage, lane: Int = 0) -> TranslationSession {
+        let key = "\(source.rawValue)>\(target.rawValue)#\(lane)"
         if let session = sessions[key] { return session }
         let session = TranslationSession(installedSource: source.localeLanguage, target: target.localeLanguage)
         sessions[key] = session
         return session
     }
 
-    /// Drops a session that failed, so the next attempt starts fresh.
+    /// Drops a pair's sessions after a failure, so the next attempt starts fresh.
     func discard(from source: AppLanguage, to target: AppLanguage) {
-        sessions["\(source.rawValue)>\(target.rawValue)"] = nil
+        for lane in 0..<Self.lanes {
+            sessions["\(source.rawValue)>\(target.rawValue)#\(lane)"] = nil
+        }
     }
 }

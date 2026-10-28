@@ -148,11 +148,12 @@ enum ScreenTranslator {
                 source: blocks[index].language,
                 rect: blocks[index].rect,
                 notes: notes,
-                isWarning: isWarning
+                isWarning: isWarning,
+                lineHeight: blocks[index].lines.map(\.rect.height).max()
             )
         }
 
-        guard let jpeg = OverlayRenderer.render(image: image, regions: regions, options: settings.overlay) else {
+        guard let jpeg = OverlayRenderer.render(image: image, regions: regions, obstacles: recognized.map(\.rect), options: settings.overlay) else {
             throw ScreenTranslateError.renderFailed
         }
         finishStep("Draw")

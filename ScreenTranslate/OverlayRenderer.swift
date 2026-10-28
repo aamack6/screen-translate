@@ -10,12 +10,16 @@ struct TranslatedRegion: Codable {
     var notes: [String] = []
     /// True when a note warns about the item's condition; the panel gets an orange border.
     var isWarning = false
+    /// Height of the original's tallest line, so the translation can match its size.
+    var lineHeight: CGFloat?
 }
 
 /// Draws translation panels over the original text. Translations too long for their panel get a
 /// number, and the full text is listed in a strip added under the screenshot.
 enum OverlayRenderer {
-    static func render(image: CGImage, regions: [TranslatedRegion], options: OverlayOptions) -> Data? {
+    /// - Parameter obstacles: every piece of text on the image, translated or not, so panels don't
+    ///   grow over text that's left as it is.
+    static func render(image: CGImage, regions: [TranslatedRegion], obstacles: [CGRect], options: OverlayOptions) -> Data? {
         let width = CGFloat(image.width)
         let height = CGFloat(image.height)
         let minFontSize = max(width * 0.026, 10)
@@ -26,7 +30,7 @@ enum OverlayRenderer {
         var panels: [Panel] = []
         var footnotes: [(number: Int, region: TranslatedRegion)] = []
         for region in regions {
-            var panel = layoutPanel(for: region, among: regions, minFontSize: minFontSize, maxFontSize: maxFontSize, imageSize: CGSize(width: width, height: height))
+            var panel = layoutPanel(for: region, avoiding: regions.map(\.rect) + obstacles, minFontSize: minFontSize, maxFontSize: maxFontSize, imageSize: CGSize(width: width, height: height))
             if !panel.fits || options.appendFullText {
                 let number = footnotes.count + 1
                 footnotes.append((number, region))
@@ -92,17 +96,17 @@ enum OverlayRenderer {
     /// Picks the largest font that fits the translation in the original text's box. The panel may
     /// grow downward a little, because English usually needs more room than Japanese, but never
     /// into the next text below it. Narrow panels (buttons) widen so no word is split.
-    private static func layoutPanel(for region: TranslatedRegion, among regions: [TranslatedRegion], minFontSize: CGFloat, maxFontSize: CGFloat, imageSize: CGSize) -> Panel {
+    private static func layoutPanel(for region: TranslatedRegion, avoiding others: [CGRect], minFontSize: CGFloat, maxFontSize: CGFloat, imageSize: CGSize) -> Panel {
         let padding = max(region.rect.height * 0.12, minFontSize * 0.3)
         let base = region.rect.insetBy(dx: -padding, dy: -padding * 0.5)
-        let nextBelow = regions
-            .map(\.rect)
-            .filter { $0.minY > region.rect.maxY - region.rect.height * 0.25 && $0.minX < region.rect.maxX && $0.maxX > region.rect.minX }
+        let own = region.rect.insetBy(dx: -1, dy: -1)
+        let nextBelow = others
+            .filter { !own.contains($0) && $0.minY > region.rect.maxY - region.rect.height * 0.25 && $0.minX < region.rect.maxX && $0.maxX > region.rect.minX }
             .map(\.minY)
             .min() ?? imageSize.height
         let maxHeight = max(base.height, min(base.height * 1.8, nextBelow - base.minY - padding * 0.25))
 
-        var size = min(maxFontSize, max(region.rect.height * 0.8, minFontSize))
+        var size = min(maxFontSize, max((region.lineHeight ?? region.rect.height) * 0.85, minFontSize))
         while size >= minFontSize {
             let frame = widened(base, toFit: longestWordWidth(region.translated, size: size) + padding * 2, imageWidth: imageSize.width)
             let needed = measure(panelText(region, size: size, colors: Colors(dark: false), number: nil), width: frame.width - padding * 2).height + padding
