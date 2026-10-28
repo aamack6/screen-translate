@@ -7,13 +7,24 @@ struct ResultView: View {
     let png: Data
     let regions: [TranslatedRegion]
     let target: AppLanguage
+    /// Called when the user says the text was in a different language. Nil hides the picker
+    /// (history items keep only the translated image).
+    var onChangeSource: ((AppLanguage) -> Void)?
 
     @State private var speaker = AVSpeechSynthesizer()
     @State private var copied = false
 
+    init(png: Data, regions: [TranslatedRegion], target: AppLanguage, onChangeSource: ((AppLanguage) -> Void)? = nil) {
+        self.png = png
+        self.regions = regions
+        self.target = target
+        self.onChangeSource = onChangeSource
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                languageChip
                 if let image = UIImage(data: png) {
                     Image(uiImage: image)
                         .resizable()
@@ -62,6 +73,30 @@ struct ResultView: View {
             }
         }
         .onDisappear { speaker.stopSpeaking(at: .immediate) }
+    }
+
+    /// "Japanese → English", with a menu to say the text was really in another language.
+    @ViewBuilder
+    private var languageChip: some View {
+        let sources = Array(Set(regions.compactMap(\.source))).sorted { $0.displayName < $1.displayName }
+        let label = "\(sources.isEmpty ? "No text found" : sources.map(\.displayName).joined(separator: ", ")) → \(target.displayName)"
+        if let onChangeSource {
+            Menu {
+                Section("Wrong language? Translate from:") {
+                    ForEach(AppLanguage.readable.filter { $0 != target }) { language in
+                        Button(language.displayName) { onChangeSource(language) }
+                    }
+                }
+            } label: {
+                Label(label, systemImage: "character.bubble")
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.thinMaterial, in: Capsule())
+            }
+        } else {
+            Label(label, systemImage: "character.bubble").font(.subheadline).foregroundStyle(.secondary)
+        }
     }
 
     private func speak(_ text: String) {

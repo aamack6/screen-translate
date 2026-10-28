@@ -26,7 +26,11 @@ struct ContentView: View {
     @State private var shownResult: ShownResult?
     @State private var translateError: String?
 
+    @StateObject private var store = Store.shared
+    @State private var remainingFree = Usage.remainingToday
+
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
 
     private var source: AppLanguage? { AppLanguage(rawValue: sourceSetting) }
     /// The pair whose download status is shown: the chosen source, or with automatic detection,
@@ -37,6 +41,7 @@ struct ContentView: View {
         NavigationStack {
             Form {
                 translateSection
+                proSection
                 languageSection
                 setupSection
                 pricesSection
@@ -59,7 +64,14 @@ struct ContentView: View {
                 await refreshStatus()
             }
             .navigationDestination(item: $shownResult) { result in
-                ResultView(png: result.png, regions: result.regions, target: result.target)
+                ResultView(png: result.png, regions: result.regions, target: result.target) { language in
+                    Task { await retranslate(result, from: language) }
+                }
+            }
+            .task { await store.load() }
+            .onChange(of: scenePhase) { _, phase in
+                // The Shortcuts action may have used free translations while the app was closed.
+                if phase == .active { remainingFree = Usage.remainingToday }
             }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { data in
@@ -108,6 +120,34 @@ struct ContentView: View {
                     return
                 }
                 await translate(data, skipStatusBar: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var proSection: some View {
+        Section {
+            if store.isPro {
+                Label("Pro: unlimited translations", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+            } else {
+                Text("\(remainingFree) of \(Usage.freeTranslationsPerDay) free translations left today")
+                if let product = store.proProduct {
+                    Button("Unlock unlimited, one time: \(product.displayPrice)") {
+                        Task { await store.buyPro() }
+                    }
+                }
+                Button("Restore purchases") {
+                    Task { await store.restore() }
+                }
+                if let error = store.purchaseError {
+                    Text(error).font(.footnote).foregroundStyle(.red)
+                }
+            }
+        } header: {
+            Text("ScreenTranslate Pro")
+        } footer: {
+            if !store.isPro {
+                Text("One payment, yours forever. No ads, no subscription, no coins.")
             }
         }
     }
@@ -262,12 +302,29 @@ struct ContentView: View {
     }
 
     private func translate(_ data: Data, skipStatusBar: Bool) async {
+        var settings = TranslationSettings.current
+        settings.skipStatusBar = skipStatusBar
+        await run(data, settings: settings)
+    }
+
+    /// Translates the same image again from a language the user picked, when detection got it wrong.
+    /// A retry doesn't use up a free translation.
+    private func retranslate(_ result: ShownResult, from language: AppLanguage) async {
+        var settings = TranslationSettings.current
+        settings.source = language
+        settings.skipStatusBar = result.skipStatusBar
+        settings.countsTowardAllowance = false
+        await run(result.imageData, settings: settings)
+    }
+
+    private func run(_ data: Data, settings: TranslationSettings) async {
         isTranslating = true
         translateError = nil
-        defer { isTranslating = false }
+        defer {
+            isTranslating = false
+            remainingFree = Usage.remainingToday
+        }
         do {
-            var settings = TranslationSettings.current
-            settings.skipStatusBar = skipStatusBar
             let rendered = try await ScreenTranslator.translate(data, settings: settings)
             if rendered.regions.isEmpty {
                 translateError = "No text to translate was found in that image."
@@ -275,7 +332,13 @@ struct ContentView: View {
             if keepHistory, !rendered.regions.isEmpty {
                 try? HistoryStore().add(rendered)
             }
-            shownResult = ShownResult(png: rendered.png, regions: rendered.regions, target: rendered.target)
+            shownResult = ShownResult(
+                png: rendered.png,
+                regions: rendered.regions,
+                target: rendered.target,
+                imageData: data,
+                skipStatusBar: settings.skipStatusBar
+            )
         } catch let error as ScreenTranslateError {
             translateError = error.localizedDescription
             // Point the download row at the missing language so one tap fixes it.
@@ -294,6 +357,9 @@ struct ShownResult: Hashable {
     let png: Data
     let regions: [TranslatedRegion]
     let target: AppLanguage
+    /// The untranslated image, kept so the user can retry with another source language.
+    let imageData: Data
+    let skipStatusBar: Bool
 
     static func == (lhs: ShownResult, rhs: ShownResult) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

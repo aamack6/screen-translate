@@ -25,11 +25,17 @@ enum Translator {
     static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
 
-        let session = TranslationSession(installedSource: source.localeLanguage, target: target.localeLanguage)
+        let session = await SessionCache.shared.session(from: source, to: target)
         let requests = texts.enumerated().map { index, text in
             TranslationSession.Request(sourceText: text, clientIdentifier: String(index))
         }
-        let responses = try await session.translations(from: requests)
+        let responses: [TranslationSession.Response]
+        do {
+            responses = try await session.translations(from: requests)
+        } catch {
+            await SessionCache.shared.discard(from: source, to: target)
+            throw error
+        }
 
         var results = texts
         for response in responses {
@@ -38,5 +44,26 @@ enum Translator {
             }
         }
         return results
+    }
+}
+
+/// Keeps one translation session per language pair, so repeated translations don't pay the
+/// start-up cost again (other apps get slower with every use; this keeps the speed steady).
+actor SessionCache {
+    static let shared = SessionCache()
+
+    private var sessions: [String: TranslationSession] = [:]
+
+    func session(from source: AppLanguage, to target: AppLanguage) -> TranslationSession {
+        let key = "\(source.rawValue)>\(target.rawValue)"
+        if let session = sessions[key] { return session }
+        let session = TranslationSession(installedSource: source.localeLanguage, target: target.localeLanguage)
+        sessions[key] = session
+        return session
+    }
+
+    /// Drops a session that failed, so the next attempt starts fresh.
+    func discard(from source: AppLanguage, to target: AppLanguage) {
+        sessions["\(source.rawValue)>\(target.rawValue)"] = nil
     }
 }

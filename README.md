@@ -16,6 +16,8 @@ key, and images never leave the phone.
   estimate in your currency underneath, plus a "with fees" total if you enter shipping or other extra costs.
   Exchange rates come from [ExchangeRate-API](https://www.exchangerate-api.com)'s free endpoint, are cached for
   12 hours, and the request contains only a currency code.
+- **Fair pricing:** 10 free translations a day, then one purchase for unlimited use. No ads, coins or subscription.
+- **Wrong language?** Every result shows "Japanese → English"; tap it to translate again from another language.
 - **Japanese shopping terms** (on by default when reading Japanese): ジャンク, 傷あり, 海外版, オリパ, 空箱 and about 30
   other listing words get a plain-English note, and warning terms give the panel an orange border.
 
@@ -68,6 +70,7 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | `ListingTerms.swift` | Japanese marketplace condition words and their meanings |
 | `ContentView.swift`, `ResultView.swift` | Photo and camera translation, settings, results (copy, read aloud, share), history |
 | `HistoryStore.swift` | Optional on-device history of the last 30 translations |
+| `Store.swift` | Free daily allowance and the one-time Pro unlock (StoreKit 2) |
 
 Text already in the target language, numbers and symbols stay as they are.
 

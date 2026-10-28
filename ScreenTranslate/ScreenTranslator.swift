@@ -19,6 +19,8 @@ struct TranslationSettings {
     var flagListingTerms: Bool
     /// Ignore the clock and icons at the top of a screenshot. Off for camera photos.
     var skipStatusBar = true
+    /// Count this translation against the free daily allowance.
+    var countsTowardAllowance = true
 
     static var current: TranslationSettings {
         TranslationSettings(
@@ -65,6 +67,9 @@ enum ScreenTranslateError: LocalizedError {
 /// action and by the app's own photo and camera translation.
 enum ScreenTranslator {
     static func translate(_ data: Data, settings: TranslationSettings) async throws -> RenderedTranslation {
+        if settings.countsTowardAllowance {
+            try await Usage.checkAllowance()
+        }
         guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
         let size = CGSize(width: image.width, height: image.height)
 
@@ -107,6 +112,7 @@ enum ScreenTranslator {
             return TranslatedRegion(
                 original: original,
                 translated: translations[index],
+                source: blocks[index].language,
                 rect: blocks[index].rect,
                 notes: notes,
                 isWarning: isWarning
@@ -115,6 +121,9 @@ enum ScreenTranslator {
 
         guard let png = OverlayRenderer.render(image: image, regions: regions, options: settings.overlay) else {
             throw ScreenTranslateError.renderFailed
+        }
+        if settings.countsTowardAllowance, regions.contains(where: { $0.source != nil }) {
+            Usage.recordTranslation()
         }
         return RenderedTranslation(png: png, regions: regions, target: settings.target)
     }

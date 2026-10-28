@@ -3,6 +3,8 @@ import UIKit
 struct TranslatedRegion: Codable {
     let original: String
     let translated: String
+    /// The language this text was translated from; nil for untranslated text (prices only).
+    var source: AppLanguage?
     let rect: CGRect
     /// Extra lines under the translation: converted prices and listing-term explanations.
     var notes: [String] = []
