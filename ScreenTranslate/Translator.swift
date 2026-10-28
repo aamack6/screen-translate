@@ -48,9 +48,13 @@ enum Translator {
         let engine = OnlineEngine.active
         let cache = TranslationCache(source: source, target: target, engine: engine)
         var known = cache.load()
+        for text in texts {
+            if let fixed = ButtonLabels.translation(of: text, from: source, to: target) { known[text] = fixed }
+        }
         let new = Array(Set(texts.filter { known[$0] == nil }))
         if !new.isEmpty {
-            let translated = try await translateWithEngine(new, from: source, to: target, engine: engine)
+            let context = String(texts.joined(separator: "\n").prefix(2000))
+            let translated = try await translateWithEngine(new, from: source, to: target, engine: engine, context: context)
             for (original, translation) in zip(new, translated) {
                 known[original] = translation
             }
@@ -61,9 +65,11 @@ enum Translator {
 
     /// The online engine falls back to Apple's when it fails (no signal, key used up), so a
     /// press never ends in an error the on-device engine could have handled.
-    private static func translateWithEngine(_ texts: [String], from source: AppLanguage, to target: AppLanguage, engine: OnlineEngine?) async throws -> [String] {
+    /// - Parameter context: the rest of the screen, which helps an online engine with short
+    ///   labels; it isn't translated or charged for.
+    private static func translateWithEngine(_ texts: [String], from source: AppLanguage, to target: AppLanguage, engine: OnlineEngine?, context: String? = nil) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
-        if let engine, let translated = try? await OnlineTranslator.translate(texts, from: source, to: target, engine: engine) {
+        if let engine, let translated = try? await OnlineTranslator.translate(texts, from: source, to: target, engine: engine, context: context) {
             return translated
         }
 
@@ -160,5 +166,51 @@ actor SessionCache {
     /// Drops a session that failed, so the next attempt starts fresh.
     func discard(from source: AppLanguage, to target: AppLanguage) {
         sessions["\(source.rawValue)>\(target.rawValue)"] = nil
+    }
+}
+
+/// Fixed translations for common Japanese button labels. On their own, with no sentence around
+/// them, engines sometimes get these badly wrong (DeepL turned 購入する into "Make a secret
+/// purchase").
+enum ButtonLabels {
+    private static let japaneseToEnglish: [String: String] = [
+        "購入する": "Buy",
+        "購入": "Buy",
+        "今すぐ購入": "Buy now",
+        "カートに入れる": "Add to cart",
+        "カートに追加": "Add to cart",
+        "カートを見る": "View cart",
+        "予約する": "Reserve",
+        "申し込む": "Apply",
+        "お申し込み": "Apply",
+        "詳しくはこちら": "Learn more",
+        "詳細はこちら": "Details",
+        "詳細を見る": "See details",
+        "もっと見る": "See more",
+        "一覧を見る": "See all",
+        "ログイン": "Log in",
+        "ログアウト": "Log out",
+        "新規登録": "Sign up",
+        "会員登録": "Sign up",
+        "閉じる": "Close",
+        "戻る": "Back",
+        "次へ": "Next",
+        "検索": "Search",
+        "送信": "Send",
+        "送信する": "Send",
+        "確認する": "Confirm",
+        "キャンセル": "Cancel",
+        "お気に入り": "Favorites",
+        "お気に入りに追加": "Add to favorites",
+        "入札する": "Bid",
+        "売り切れ": "Sold out",
+        "在庫なし": "Out of stock",
+        "在庫あり": "In stock",
+    ]
+
+    static func translation(of text: String, from source: AppLanguage, to target: AppLanguage) -> String? {
+        guard source == .japanese, target == .english else { return nil }
+        let key = text.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        return japaneseToEnglish[key]
     }
 }

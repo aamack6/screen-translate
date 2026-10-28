@@ -37,11 +37,11 @@ enum OnlineTranslator {
         return URLSession(configuration: configuration)
     }()
 
-    static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage, engine: OnlineEngine) async throws -> [String] {
+    static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage, engine: OnlineEngine, context: String? = nil) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
         guard let key = APIKeyStore.key(for: engine) else { throw OnlineError.noKey }
         switch engine {
-        case .deepL: return try await deepL(texts, from: source, to: target, key: key)
+        case .deepL: return try await deepL(texts, from: source, to: target, key: key, context: context)
         case .google: return try await google(texts, from: source, to: target, key: key)
         case .off: throw OnlineError.noKey
         }
@@ -75,16 +75,19 @@ enum OnlineTranslator {
 
     // MARK: - DeepL
 
-    private static func deepL(_ texts: [String], from source: AppLanguage, to target: AppLanguage, key: String) async throws -> [String] {
+    private static func deepL(_ texts: [String], from source: AppLanguage, to target: AppLanguage, key: String, context: String?) async throws -> [String] {
         var request = URLRequest(url: URL(string: "https://\(host(for: .deepL))/v2/translate")!)
         request.httpMethod = "POST"
         request.setValue("DeepL-Auth-Key \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
+        var body: [String: Any] = [
             "text": texts,
             "source_lang": deepLSource(source),
             "target_lang": deepLTarget(target),
-        ])
+        ]
+        // The rest of the screen, so a lone button label reads as a button. Not charged.
+        if let context, !context.isEmpty { body["context"] = context }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         struct Response: Decodable {
             struct Translation: Decodable { let text: String }
