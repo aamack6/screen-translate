@@ -134,8 +134,11 @@ enum ScreenTranslator {
                 AppSettings.lastDetectedSource = mostCommon
             }
         }
-        // The real translation reuses the warmed-up session; don't run both at once.
-        await warmUp.value
+        // The real translation reuses the warmed-up session; don't run both at once. An online
+        // engine has nothing to load, so it goes straight away.
+        if OnlineEngine.active == nil {
+            await warmUp.value
+        }
         finishStep("Load")
         let translations = try await translateBlocks(blocks, originals: originals, target: settings.target)
         finishStep("Translate")

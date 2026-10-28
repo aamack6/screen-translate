@@ -47,6 +47,22 @@ enum OnlineTranslator {
         }
     }
 
+    /// Opens the connection (DNS, TLS) ahead of the first translation without translating
+    /// anything, so it costs nothing against the key's allowance.
+    static func preconnect(_ engine: OnlineEngine) async {
+        guard let url = URL(string: "https://\(host(for: engine))/") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        _ = try? await session.data(for: request)
+    }
+
+    private static func host(for engine: OnlineEngine) -> String {
+        switch engine {
+        case .deepL: return (APIKeyStore.key(for: .deepL) ?? "").hasSuffix(":fx") ? "api-free.deepl.com" : "api.deepl.com"
+        case .google, .off: return "translation.googleapis.com"
+        }
+    }
+
     /// Checks a key by translating one word, so the settings screen can say whether it works.
     static func test(_ engine: OnlineEngine) async -> String? {
         do {
@@ -60,9 +76,7 @@ enum OnlineTranslator {
     // MARK: - DeepL
 
     private static func deepL(_ texts: [String], from source: AppLanguage, to target: AppLanguage, key: String) async throws -> [String] {
-        // Free keys end in ":fx" and use their own address.
-        let host = key.hasSuffix(":fx") ? "api-free.deepl.com" : "api.deepl.com"
-        var request = URLRequest(url: URL(string: "https://\(host)/v2/translate")!)
+        var request = URLRequest(url: URL(string: "https://\(host(for: .deepL))/v2/translate")!)
         request.httpMethod = "POST"
         request.setValue("DeepL-Auth-Key \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -102,7 +116,7 @@ enum OnlineTranslator {
     // MARK: - Google
 
     private static func google(_ texts: [String], from source: AppLanguage, to target: AppLanguage, key: String) async throws -> [String] {
-        var request = URLRequest(url: URL(string: "https://translation.googleapis.com/language/translate/v2")!)
+        var request = URLRequest(url: URL(string: "https://\(host(for: .google))/language/translate/v2")!)
         request.httpMethod = "POST"
         request.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

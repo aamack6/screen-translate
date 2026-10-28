@@ -22,9 +22,14 @@ enum Translator {
 
     /// Loads the translation model for a pair by translating a tiny text, so a translation that
     /// follows straight after doesn't wait for it. Fails quietly if the pair isn't downloaded.
+    /// With an online engine there's no model to load; it only opens the connection.
     static func warmUp(from source: AppLanguage, to target: AppLanguage) async {
         guard source != target else { return }
-        _ = try? await translateWithEngine(["OK"], from: source, to: target, engine: OnlineEngine.active)
+        if let engine = OnlineEngine.active {
+            await OnlineTranslator.preconnect(engine)
+            return
+        }
+        _ = try? await translateWithEngine(["OK"], from: source, to: target, engine: nil)
     }
 
     /// Warms up the language the user most likely reads next: the chosen one, or with automatic
