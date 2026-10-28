@@ -19,6 +19,13 @@ enum Translator {
         }
     }
 
+    /// Loads the translation model for a pair by translating a tiny text, so a translation that
+    /// follows straight after doesn't wait for it. Does nothing if the pair isn't downloaded.
+    static func warmUp(from source: AppLanguage, to target: AppLanguage) async {
+        guard source != target, await status(from: source, to: target) == .installed else { return }
+        _ = try? await translate(["OK"], from: source, to: target)
+    }
+
     /// Translates the texts in one batch and returns them in the same order.
     /// The languages must already be downloaded (see `ContentView`'s Download button),
     /// because the Shortcuts action can't show Apple's download prompt.

@@ -82,6 +82,13 @@ enum ScreenTranslator {
             stepStart = clock.now
         }
 
+        // Loading a translation model takes about as long as reading the text, so start it now
+        // for the language this screenshot is most likely in.
+        let likelySource = settings.source ?? AppSettings.lastDetectedSource
+        let warmUp = Task {
+            if let likelySource { await Translator.warmUp(from: likelySource, to: settings.target) }
+        }
+
         guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
         let size = CGSize(width: image.width, height: image.height)
 
@@ -101,6 +108,14 @@ enum ScreenTranslator {
         finishStep("Read")
 
         let originals = blocks.map(\.text)
+        if settings.source == nil {
+            let counts = Dictionary(grouping: blocks.compactMap(\.language), by: { $0 }).mapValues(\.count)
+            if let mostCommon = counts.max(by: { $0.value < $1.value })?.key {
+                AppSettings.lastDetectedSource = mostCommon
+            }
+        }
+        // The real translation reuses the warmed-up session; don't run both at once.
+        await warmUp.value
         let translations = try await translateBlocks(blocks, originals: originals, target: settings.target)
         finishStep("Translate")
         let rates = await priceRates(for: originals, blocks: blocks, settings: settings)

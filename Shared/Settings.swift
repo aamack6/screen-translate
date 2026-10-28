@@ -175,6 +175,7 @@ enum SettingsKey {
     static let darkPanels = "darkPanels"
     static let appendFullText = "appendFullText"
     static let keepHistory = "keepHistory"
+    static let lastDetectedSource = "lastDetectedSource"
 }
 
 /// Stored source-language value meaning "detect the language automatically".
@@ -188,6 +189,13 @@ enum AppSettings {
     /// Nil = detect automatically (the default).
     static var sourceLanguage: AppLanguage? {
         AppLanguage(rawValue: defaults.string(forKey: SettingsKey.sourceLanguage) ?? autoDetectSetting)
+    }
+
+    /// With automatic detection, the language most of the last screenshot was in: the best guess
+    /// for which translation model to start loading before the text has been read.
+    static var lastDetectedSource: AppLanguage? {
+        get { defaults.string(forKey: SettingsKey.lastDetectedSource).flatMap(AppLanguage.init(rawValue:)) }
+        set { defaults.set(newValue?.rawValue, forKey: SettingsKey.lastDetectedSource) }
     }
 
     /// Defaults to the phone's language when the app supports it, otherwise English.
