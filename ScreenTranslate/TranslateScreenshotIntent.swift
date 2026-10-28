@@ -36,7 +36,7 @@ struct TranslateScreenshotIntent: AppIntent {
         if AppSettings.keepHistory, !result.regions.isEmpty {
             try? HistoryStore().add(result)
         }
-        return .result(value: IntentFile(data: result.png, filename: "Translated-Screenshot.png", type: .png))
+        return .result(value: IntentFile(data: result.jpeg, filename: "Translated-Screenshot.jpg", type: .jpeg))
     }
 }
 

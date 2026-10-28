@@ -65,7 +65,7 @@ struct ContentView: View {
                 await refreshStatus()
             }
             .navigationDestination(item: $shownResult) { result in
-                ResultView(png: result.png, regions: result.regions, target: result.target) { language in
+                ResultView(jpeg: result.jpeg, regions: result.regions, target: result.target, timings: result.timings) { language in
                     Task { await retranslate(result, from: language) }
                 }
             }
@@ -347,7 +347,8 @@ struct ContentView: View {
                 try? HistoryStore().add(rendered)
             }
             shownResult = ShownResult(
-                png: rendered.png,
+                jpeg: rendered.jpeg,
+                timings: rendered.timings,
                 regions: rendered.regions,
                 target: rendered.target,
                 imageData: data,
@@ -368,12 +369,13 @@ struct ContentView: View {
 /// A translation to open from the Translate section, usable with `navigationDestination(item:)`.
 struct ShownResult: Hashable {
     let id = UUID()
-    let png: Data
+    let jpeg: Data
     let regions: [TranslatedRegion]
     let target: AppLanguage
     /// The untranslated image, kept so the user can retry with another source language.
     let imageData: Data
     let skipStatusBar: Bool
+    let timings: String
 
     static func == (lhs: ShownResult, rhs: ShownResult) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

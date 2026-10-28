@@ -46,7 +46,7 @@ enum OverlayRenderer {
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height + footerHeight), format: format)
 
-        return renderer.pngData { context in
+        return renderer.jpegData(withCompressionQuality: 0.9) { context in
             UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: width, height: height))
 
             for panel in panels {

@@ -4,9 +4,11 @@ import SwiftUI
 /// Shows a translated image with its translations as selectable text, each with a button to
 /// hear it read aloud.
 struct ResultView: View {
-    let png: Data
+    let jpeg: Data
     let regions: [TranslatedRegion]
     let target: AppLanguage
+    /// How long each step took, shown small under the image. Empty for history items.
+    let timings: String
     /// Called when the user says the text was in a different language. Nil hides the picker
     /// (history items keep only the translated image).
     var onChangeSource: ((AppLanguage) -> Void)?
@@ -14,8 +16,9 @@ struct ResultView: View {
     @State private var speaker = AVSpeechSynthesizer()
     @State private var copied = false
 
-    init(png: Data, regions: [TranslatedRegion], target: AppLanguage, onChangeSource: ((AppLanguage) -> Void)? = nil) {
-        self.png = png
+    init(jpeg: Data, regions: [TranslatedRegion], target: AppLanguage, timings: String = "", onChangeSource: ((AppLanguage) -> Void)? = nil) {
+        self.jpeg = jpeg
+        self.timings = timings
         self.regions = regions
         self.target = target
         self.onChangeSource = onChangeSource
@@ -25,11 +28,14 @@ struct ResultView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 languageChip
-                if let image = UIImage(data: png) {
+                if let image = UIImage(data: jpeg) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                if !timings.isEmpty {
+                    Text(timings).font(.caption2).foregroundStyle(.secondary)
                 }
                 ForEach(Array(regions.enumerated()), id: \.offset) { _, region in
                     VStack(alignment: .leading, spacing: 4) {
@@ -65,7 +71,7 @@ struct ResultView: View {
                 copied = true
             }
             .disabled(regions.isEmpty)
-            if let image = UIImage(data: png) {
+            if let image = UIImage(data: jpeg) {
                 ShareLink(
                     item: Image(uiImage: image),
                     preview: SharePreview("Translated image", image: Image(uiImage: image))
@@ -121,8 +127,8 @@ struct HistoryView: View {
             }
             ForEach(items) { item in
                 NavigationLink {
-                    if let png = store.imageData(for: item) {
-                        ResultView(png: png, regions: item.regions, target: item.target)
+                    if let jpeg = store.imageData(for: item) {
+                        ResultView(jpeg: jpeg, regions: item.regions, target: item.target)
                     }
                 } label: {
                     VStack(alignment: .leading) {

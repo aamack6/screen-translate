@@ -6,7 +6,7 @@ struct HistoryItem: Codable, Identifiable {
     let target: AppLanguage
     let regions: [TranslatedRegion]
 
-    var fileName: String { "\(id.uuidString).png" }
+    var fileName: String { "\(id.uuidString).jpg" }
 }
 
 /// Keeps recent translations in the app's own storage on this device. Nothing leaves the phone.
@@ -30,7 +30,7 @@ struct HistoryStore {
 
     func add(_ result: RenderedTranslation) throws {
         let item = HistoryItem(id: UUID(), date: Date(), target: result.target, regions: result.regions)
-        try result.png.write(to: directory.appendingPathComponent(item.fileName), options: .completeFileProtectionUntilFirstUserAuthentication)
+        try result.jpeg.write(to: directory.appendingPathComponent(item.fileName), options: .completeFileProtectionUntilFirstUserAuthentication)
 
         var items = [item] + load()
         for old in items.dropFirst(Self.limit) {

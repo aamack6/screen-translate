@@ -70,7 +70,11 @@ enum Usage {
     private static let countKey = "usage.count"
     private static let proKey = "usage.isPro"
 
-    static var isProCached: Bool { UserDefaults.standard.bool(forKey: proKey) }
+    static var isProCached: Bool { isDeveloperBuild || UserDefaults.standard.bool(forKey: proKey) }
+
+    /// Builds installed from Xcode carry a development provisioning profile; App Store and
+    /// TestFlight builds don't. The developer's own copy is unlimited.
+    static let isDeveloperBuild = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil
 
     static var usedToday: Int {
         let defaults = UserDefaults.standard
@@ -81,6 +85,7 @@ enum Usage {
 
     /// Checks the App Store receipt and caches the answer for quick reads.
     static func hasProEntitlement() async -> Bool {
+        if isDeveloperBuild { return true }
         var owned = false
         for await entitlement in Transaction.currentEntitlements {
             if case .verified(let transaction) = entitlement,

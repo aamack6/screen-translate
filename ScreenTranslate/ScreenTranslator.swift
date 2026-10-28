@@ -2,10 +2,12 @@ import Foundation
 import ImageIO
 
 struct RenderedTranslation {
-    /// The image with translation panels, as PNG.
-    let png: Data
+    /// The image with translation panels, as JPEG.
+    let jpeg: Data
     let regions: [TranslatedRegion]
     let target: AppLanguage
+    /// How long each step took, like "Read 0.8s · Translate 1.2s · Draw 0.2s".
+    let timings: String
 }
 
 /// Everything the user can choose that affects a translation.
@@ -70,6 +72,16 @@ enum ScreenTranslator {
         if settings.countsTowardAllowance {
             try await Usage.checkAllowance()
         }
+        let clock = ContinuousClock()
+        var steps: [String] = []
+        var stepStart = clock.now
+        func finishStep(_ name: String) {
+            let elapsed = (clock.now - stepStart).components
+            let seconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+            steps.append("\(name) \(String(format: "%.1f", seconds))s")
+            stepStart = clock.now
+        }
+
         guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
         let size = CGSize(width: image.width, height: image.height)
 
@@ -86,10 +98,13 @@ enum ScreenTranslator {
             }
         }
         let blocks = TextGeometry.groupIntoBlocks(lines)
+        finishStep("Read")
 
         let originals = blocks.map(\.text)
         let translations = try await translateBlocks(blocks, originals: originals, target: settings.target)
+        finishStep("Translate")
         let rates = await priceRates(for: originals, blocks: blocks, settings: settings)
+        if settings.prices != nil { finishStep("Prices") }
 
         let regions = blocks.indices.map { index in
             let original = originals[index]
@@ -119,13 +134,14 @@ enum ScreenTranslator {
             )
         }
 
-        guard let png = OverlayRenderer.render(image: image, regions: regions, options: settings.overlay) else {
+        guard let jpeg = OverlayRenderer.render(image: image, regions: regions, options: settings.overlay) else {
             throw ScreenTranslateError.renderFailed
         }
+        finishStep("Draw")
         if settings.countsTowardAllowance, regions.contains(where: { $0.source != nil }) {
             Usage.recordTranslation()
         }
-        return RenderedTranslation(png: png, regions: regions, target: settings.target)
+        return RenderedTranslation(jpeg: jpeg, regions: regions, target: settings.target, timings: steps.joined(separator: " · "))
     }
 
     /// Translates each block from its own language, one batch per language. Price-only blocks
