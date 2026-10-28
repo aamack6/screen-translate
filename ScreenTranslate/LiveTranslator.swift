@@ -302,7 +302,9 @@ enum LiveLayout: String, CaseIterable, Identifiable {
 enum LivePanelRenderer {
     /// A wide 3:1 strip, so the window covers as little of the screen as iOS allows. Users can
     /// pinch it larger, or swipe it to the edge of the screen to tuck it away.
-    static let size = CGSize(width: 720, height: 240)
+    /// It's drawn at a low resolution on purpose: the window scales the frame to fit, so fewer
+    /// pixels mean larger text.
+    static let size = CGSize(width: 450, height: 150)
 
     static func sampleBuffer(lines: [String], footer: String?) -> CMSampleBuffer? {
         guard let image = render(lines: lines, footer: footer).cgImage,
@@ -318,24 +320,24 @@ enum LivePanelRenderer {
             UIColor(white: 0.08, alpha: 1).setFill()
             context.fill(CGRect(origin: .zero, size: size))
 
-            let inset: CGFloat = 16
+            let inset: CGFloat = 10
             let width = size.width - inset * 2
             var bottom = size.height - inset
             if let footer {
                 let footerText = NSAttributedString(string: footer, attributes: [
-                    .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+                    .font: UIFont.systemFont(ofSize: 13, weight: .medium),
                     .foregroundColor: UIColor.systemOrange,
                 ])
                 let height = footerText.boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, context: nil).height
                 bottom -= ceil(height)
                 footerText.draw(with: CGRect(x: inset, y: bottom, width: width, height: height), options: .usesLineFragmentOrigin, context: nil)
-                bottom -= 8
+                bottom -= 5
             }
 
             // Shrink the text until everything fits, down to a size that's still readable;
             // past that, the lowest lines are cut.
             let available = bottom - inset
-            var fontSize: CGFloat = 24
+            var fontSize: CGFloat = 20
             var text = attributed(lines, fontSize: fontSize)
             while fontSize > 15, height(of: text, width: width) > available {
                 fontSize -= 2
@@ -349,7 +351,9 @@ enum LivePanelRenderer {
     /// Translations are longer than the Japanese they replace, so a panel may grow downward,
     /// and its text shrinks until it fits.
     static func sampleBuffer(screen blocks: [(rect: CGRect, text: String)], thumbnail: Data?, aspect: Double, footer: String?) -> CMSampleBuffer? {
-        let width: CGFloat = 480
+        // Few pixels on purpose, as with the list: the window scales the frame down, and text has
+        // to stay readable at half the screen's width.
+        let width: CGFloat = 300
         let canvas = CGSize(width: width, height: (width * CGFloat(min(max(aspect, 0.4), 2.5)) / 2).rounded() * 2)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -368,12 +372,14 @@ enum LivePanelRenderer {
                     width: block.rect.width * canvas.width,
                     height: block.rect.height * canvas.height
                 ).insetBy(dx: -2, dy: -1)
-                panel.size.width = min(max(panel.width, 70), canvas.width - max(panel.minX, 0))
+                panel.size.width = min(max(panel.width, 80), canvas.width - max(panel.minX, 0))
                 let textWidth = panel.width - 4
 
-                var fontSize = min(max(panel.height * 0.75, 9), 20)
+                // Readability comes first: text never goes below 12 px, and the panel grows
+                // downward (over the faded screen) to fit it.
+                var fontSize = min(max(panel.height * 0.9, 14), 18)
                 var text = panelText(block.text, fontSize: fontSize)
-                while fontSize > 7, height(of: text, width: textWidth) > max(panel.height, fontSize * 2.6) {
+                while fontSize > 12, height(of: text, width: textWidth) > max(panel.height, fontSize * 3.6) {
                     fontSize -= 1
                     text = panelText(block.text, fontSize: fontSize)
                 }
@@ -386,13 +392,13 @@ enum LivePanelRenderer {
 
             if let footer {
                 let footerText = NSAttributedString(string: footer, attributes: [
-                    .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+                    .font: UIFont.systemFont(ofSize: 12, weight: .medium),
                     .foregroundColor: UIColor.systemOrange,
                 ])
-                let band = CGRect(x: 0, y: canvas.height - 44, width: canvas.width, height: 44)
+                let band = CGRect(x: 0, y: canvas.height - 34, width: canvas.width, height: 34)
                 UIColor(white: 0.08, alpha: 0.9).setFill()
                 context.fill(band)
-                footerText.draw(with: band.insetBy(dx: 12, dy: 6), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
+                footerText.draw(with: band.insetBy(dx: 8, dy: 4), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], context: nil)
             }
         }
         guard let cgImage = image.cgImage, let pixelBuffer = pixelBuffer(from: cgImage) else { return nil }
