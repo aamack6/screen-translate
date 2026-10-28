@@ -10,7 +10,9 @@ struct TranslateScreenshotIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
-    @Parameter(title: "Screenshot", supportedContentTypes: [.image])
+    // Connects to the previous action's output, so Take Screenshot → Translate Screenshot is
+    // linked as soon as the action is added.
+    @Parameter(title: "Screenshot", supportedContentTypes: [.image], inputConnectionBehavior: .connectToPreviousIntentResult)
     var screenshot: IntentFile
 
     @Parameter(title: "From", description: "Leave empty to use the app's setting (automatic detection unless you changed it).")
