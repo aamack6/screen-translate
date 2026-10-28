@@ -1,21 +1,26 @@
 # ScreenTranslate
 
-An iPhone app that translates the text in a screenshot with one press of the Action Button. It reads Japanese,
-Chinese or Korean text, translates it into English or another language, and draws the translation over the original
-text. Translation runs on the iPhone with Apple's Vision and Translation frameworks: no account, no API key, no
-screenshot ever leaves the phone.
+An iPhone translator for anything on screen or in front of you. Press the Action Button (or Back Tap, or a Control
+Center button) in any app, or point the camera at a menu, sign or document, and the translation is drawn right over
+the original text. Translation runs on the iPhone with Apple's Vision and Translation frameworks: no account, no API
+key, and images never leave the phone.
 
-Made for shopping and collecting from Japan:
-
-- **Convert prices** (optional): ¥12,800, 12,800円, 1万2000円, 150元, NT$990 or 25,000원 get an estimate in USD, EUR,
-  GBP and other currencies underneath, plus a "with fees" total if you enter extra costs such as a proxy-service fee.
+- **Any direction:** reads 15 languages (English, Spanish, French, German, Italian, Portuguese, Russian, Ukrainian,
+  Japanese, Chinese, Korean, Thai, Vietnamese, Arabic) and translates into 20, defaulting to the phone's language.
+- **Automatic detection:** each piece of text is checked on its own, so a screen mixing several languages works, and
+  text already in your language is left alone.
+- **Camera and photos:** translate a photo, screenshot or camera shot from inside the app.
+- **Results you can use:** copy all the text, hear any line read aloud, share the image, and keep an optional
+  on-device history.
+- **Convert prices** (optional): $19.99, 12,50 €, £8, ¥12,800, 1万2000円, NT$990, 25,000원, ₹499 and more get an
+  estimate in your currency underneath, plus a "with fees" total if you enter shipping or other extra costs.
   Exchange rates come from [ExchangeRate-API](https://www.exchangerate-api.com)'s free endpoint, are cached for
   12 hours, and the request contains only a currency code.
-- **Explain condition words** (Japanese, on by default): ジャンク, 傷あり, 海外版, オリパ, 空箱 and about 30 other listing
-  terms get a plain-English note, and warning terms give the panel an orange border.
+- **Japanese shopping terms** (on by default when reading Japanese): ジャンク, 傷あり, 海外版, オリパ, 空箱 and about 30
+  other listing words get a plain-English note, and warning terms give the panel an orange border.
 
 This is a rebuild of an earlier ChatGPT-made prototype whose source was lost. It keeps the same design (a Shortcuts
-action fed by Take Screenshot) and adds more languages, a history and a cleaner layout engine.
+action fed by Take Screenshot) and adds the features above and a cleaner layout engine.
 
 ## Requirements
 
@@ -37,11 +42,13 @@ If the project won't open, regenerate it with [XcodeGen](https://github.com/yona
 
 ## Set it up on the phone
 
-1. Open ScreenTranslate, pick the language you read, and tap **Download languages**. Approve Apple's prompt.
+1. Open ScreenTranslate, check the **To** language, and download the languages you expect to read (Apple asks once
+   per language pair).
 2. In the Shortcuts app, make a shortcut called **Screen Translate** with three actions:
    **Take Screenshot** → **Translate Screenshot** (Screenshot = the result of Take Screenshot) → **Quick Look**.
-3. Settings › Action Button › Shortcut › Screen Translate.
-4. Open any app with Japanese text and press the Action Button.
+3. Put it on a button: Settings › Action Button › Shortcut (iPhone 15 Pro and newer), or on any iPhone
+   Settings › Accessibility › Touch › Back Tap › Double Tap, or a Shortcut control in Control Center.
+4. Open any app with foreign text and press the button.
 
 Tip: share the finished shortcut (Share › Copy iCloud Link) and paste the link into `AppLinks.readyMadeShortcut`
 in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortcut** button.
@@ -52,21 +59,22 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | --- | --- |
 | `TranslateScreenshotIntent.swift` | The **Translate Screenshot** action in Shortcuts |
 | `ScreenTranslator.swift` | The pipeline: decode image → find text → group lines → translate → draw |
-| `TextRecognizer.swift` | Vision text recognition for the chosen language |
+| `TextRecognizer.swift` | Vision text recognition for the chosen language, or with automatic detection |
+| `LanguageDetector.swift` | Decides per line whether to translate and from which language |
 | `TextGeometry.swift` | Coordinate conversion, status-bar filter, joining wrapped lines into paragraphs |
 | `Translator.swift` | Apple's on-device Translation (language status and batch translation) |
-| `OverlayRenderer.swift` | Draws the English panels; long translations get a number and a footnote under the image |
-| `Prices.swift` | Finds prices in the text and fetches/caches exchange rates |
+| `OverlayRenderer.swift` | Draws the translation panels; long translations get a number and a footnote under the image |
+| `Prices.swift` | Finds prices in about 20 currencies and fetches/caches exchange rates |
 | `ListingTerms.swift` | Japanese marketplace condition words and their meanings |
-| `ContentView.swift`, `ResultView.swift` | Setup screen, options, in-app test, history |
+| `ContentView.swift`, `ResultView.swift` | Photo and camera translation, settings, results (copy, read aloud, share), history |
 | `HistoryStore.swift` | Optional on-device history of the last 30 translations |
 
-Only text in the chosen language's script is replaced, so English, numbers and prices stay as they are.
+Text already in the target language, numbers and symbols stay as they are.
 
 ## Not tested yet
 
 This code was written without a Mac, so it has not been compiled. Expect a few small compile fixes in Xcode the
-first time. Known limits: vertical text (manga) is read poorly by Vision; the Shortcuts action can't show Apple's
+first time. Known limits: vertical text (manga) is read poorly by Vision; with automatic detection Vision picks one main language per image, so a second script on the same screen may be read less accurately; the Shortcuts action can't show Apple's
 language download prompt, which is why the app has a Download button.
 
 See [docs/APP_STORE.md](docs/APP_STORE.md) for the path to selling it.

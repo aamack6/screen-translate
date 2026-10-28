@@ -4,6 +4,8 @@ import CoreGraphics
 struct TextLine {
     let text: String
     let rect: CGRect
+    /// The language to translate this line from; nil = leave it untranslated (prices only).
+    var language: AppLanguage?
 }
 
 /// Neighbouring lines merged into one paragraph, so sentences that wrap are translated whole.
@@ -16,8 +18,10 @@ struct TextBlock {
         rect = line.rect
     }
 
-    func text(joinedBy joiner: String) -> String {
-        lines.map(\.text).joined(separator: joiner)
+    var language: AppLanguage? { lines.first?.language }
+
+    var text: String {
+        lines.map(\.text).joined(separator: language?.lineJoiner ?? " ")
     }
 
     mutating func append(_ line: TextLine) {
@@ -43,15 +47,15 @@ enum TextGeometry {
         return rect.maxY < imageSize.height * 0.045
     }
 
-    /// Groups lines into paragraphs: a line joins a block when it sits just below the block's
-    /// last line, has a similar height, and overlaps it horizontally.
+    /// Groups lines into paragraphs: a line joins a block when it's in the same language, sits just
+    /// below the block's last line, has a similar height, and overlaps it horizontally.
     static func groupIntoBlocks(_ lines: [TextLine]) -> [TextBlock] {
         let sorted = lines.sorted { $0.rect.minY < $1.rect.minY }
         var blocks: [TextBlock] = []
 
         for line in sorted {
             let index = blocks.lastIndex { block in
-                guard let last = block.lines.last else { return false }
+                guard let last = block.lines.last, last.language == line.language else { return false }
                 return continues(last.rect, with: line.rect)
             }
             if let index {

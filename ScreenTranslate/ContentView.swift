@@ -3,44 +3,52 @@ import SwiftUI
 import Translation
 
 struct ContentView: View {
-    @AppStorage(SettingsKey.sourceLanguage) private var source: SourceLanguage = .japanese
-    @AppStorage(SettingsKey.targetLanguage) private var target: TargetLanguage = .english
+    @AppStorage(SettingsKey.sourceLanguage) private var sourceSetting = autoDetectSetting
+    @AppStorage(SettingsKey.targetLanguage) private var target: AppLanguage = AppSettings.deviceLanguage
     @AppStorage(SettingsKey.convertPrices) private var convertPrices = false
-    @AppStorage(SettingsKey.displayCurrency) private var currency: DisplayCurrency = .usd
+    @AppStorage(SettingsKey.displayCurrency) private var currency = DisplayCurrency.deviceDefault
     @AppStorage(SettingsKey.extraCost) private var extraCost = 0.0
     @AppStorage(SettingsKey.flagListingTerms) private var flagListingTerms = true
     @AppStorage(SettingsKey.darkPanels) private var darkPanels = false
     @AppStorage(SettingsKey.appendFullText) private var appendFullText = false
     @AppStorage(SettingsKey.keepHistory) private var keepHistory = false
 
+    /// With automatic detection, the language whose download the Language section shows.
+    @State private var downloadSource: AppLanguage = .japanese
     @State private var status: LanguageStatus?
     @State private var translationConfig: TranslationSession.Configuration?
     @State private var downloadError: String?
     @State private var ratesUpdated: Date?
 
     @State private var pickerItem: PhotosPickerItem?
+    @State private var showCamera = false
     @State private var isTranslating = false
     @State private var shownResult: ShownResult?
-    @State private var testError: String?
+    @State private var translateError: String?
 
     @Environment(\.openURL) private var openURL
+
+    private var source: AppLanguage? { AppLanguage(rawValue: sourceSetting) }
+    /// The pair whose download status is shown: the chosen source, or with automatic detection,
+    /// the language picked in the download row.
+    private var statusSource: AppLanguage { source ?? downloadSource }
 
     var body: some View {
         NavigationStack {
             Form {
+                translateSection
                 languageSection
                 setupSection
-                shoppingSection
+                pricesSection
                 optionsSection
-                testSection
                 Section {
                     NavigationLink("History") { HistoryView() }
                 } footer: {
-                    Text("Everything happens on this iPhone. No account, no subscription, no API key. Screenshots aren't saved to Photos.")
+                    Text("Translation happens on this iPhone. No account, no API key, and images never leave your phone. Screenshots aren't saved to Photos.")
                 }
             }
             .navigationTitle("ScreenTranslate")
-            .task(id: "\(source.rawValue)>\(target.rawValue)") { await refreshStatus() }
+            .task(id: "\(statusSource.rawValue)>\(target.rawValue)") { await refreshStatus() }
             .translationTask(translationConfig) { session in
                 do {
                     try await session.prepareTranslation()
@@ -51,50 +59,110 @@ struct ContentView: View {
                 await refreshStatus()
             }
             .navigationDestination(item: $shownResult) { result in
-                ResultView(png: result.png, regions: result.regions)
+                ResultView(png: result.png, regions: result.regions, target: result.target)
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { data in
+                    showCamera = false
+                    if let data {
+                        Task { await translate(data, skipStatusBar: false) }
+                    }
+                }
+                .ignoresSafeArea()
             }
         }
     }
 
     // MARK: - Sections
 
+    private var translateSection: some View {
+        Section {
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Label("Translate a photo or screenshot", systemImage: "photo.on.rectangle")
+            }
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button {
+                    showCamera = true
+                } label: {
+                    Label("Translate with the camera", systemImage: "camera")
+                }
+            }
+            if isTranslating {
+                ProgressView("Reading and translating…")
+            }
+            if let translateError {
+                Text(translateError).font(.footnote).foregroundStyle(.red)
+            }
+        } header: {
+            Text("Translate")
+        } footer: {
+            Text("Menus, signs, documents, games, chats, shopping sites: anything with text. For other apps, set up the one-press shortcut below.")
+        }
+        .disabled(isTranslating)
+        .onChange(of: pickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                defer { pickerItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self) else {
+                    translateError = ScreenTranslateError.unreadableImage.localizedDescription
+                    return
+                }
+                await translate(data, skipStatusBar: true)
+            }
+        }
+    }
+
     private var languageSection: some View {
         Section {
-            Picker("Translate from", selection: $source) {
-                ForEach(SourceLanguage.allCases) { language in
+            Picker("From", selection: $sourceSetting) {
+                Text("Detect automatically").tag(autoDetectSetting)
+                ForEach(AppLanguage.readable) { language in
+                    Text(language.displayName).tag(language.rawValue)
+                }
+            }
+            Picker("To", selection: $target) {
+                ForEach(AppLanguage.allCases) { language in
                     Text(language.displayName).tag(language)
                 }
             }
-            Picker("Translate to", selection: $target) {
-                ForEach(TargetLanguage.allCases) { language in
-                    Text(language.displayName).tag(language)
+            if source == nil {
+                Picker("Download for", selection: $downloadSource) {
+                    ForEach(AppLanguage.readable.filter { $0 != target }) { language in
+                        Text(language.displayName).tag(language)
+                    }
                 }
             }
             statusRow
             if status == .needsDownload {
-                Button("Download languages") { downloadLanguages() }
+                Button("Download \(statusSource.displayName) → \(target.displayName)") { downloadLanguages() }
             }
             if let downloadError {
                 Text(downloadError).font(.footnote).foregroundStyle(.red)
             }
         } header: {
-            Text("Language")
+            Text("Languages")
         } footer: {
-            Text("Approve Apple's language download once for each pair, and after that translation works offline.")
+            Text(source == nil
+                ? "Each language is detected on its own, so mixed screens work. Download each language you expect to read once; after that, translation works offline."
+                : "Approve Apple's download once, and after that translation works offline.")
         }
     }
 
     @ViewBuilder
     private var statusRow: some View {
-        switch status {
-        case nil:
-            Label("Checking languages…", systemImage: "hourglass")
-        case .installed:
-            Label("Ready to translate", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        case .needsDownload:
-            Label("Download needed", systemImage: "arrow.down.circle").foregroundStyle(.orange)
-        case .unsupported:
-            Label("Not available on this device", systemImage: "xmark.octagon").foregroundStyle(.red)
+        if statusSource == target {
+            Label("Pick two different languages", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+        } else {
+            switch status {
+            case nil:
+                Label("Checking languages…", systemImage: "hourglass")
+            case .installed:
+                Label("\(statusSource.displayName) is ready", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            case .needsDownload:
+                Label("Download needed", systemImage: "arrow.down.circle").foregroundStyle(.orange)
+            case .unsupported:
+                Label("Not available on this device", systemImage: "xmark.octagon").foregroundStyle(.red)
+            }
         }
     }
 
@@ -105,7 +173,10 @@ struct ContentView: View {
                 Text("2. Add Take Screenshot.")
                 Text("3. Add Translate Screenshot, with the screenshot from step 2.")
                 Text("4. Add Quick Look, showing the result of step 3.")
-                Text("5. In Settings › Action Button, choose Shortcut › Screen Translate.")
+                Text("5. Put it on a button:")
+                Text("• Action Button: Settings › Action Button › Shortcut")
+                Text("• Any iPhone: Settings › Accessibility › Touch › Back Tap › Double Tap")
+                Text("• Control Center: edit Control Center › Add a Control › Shortcut")
             }
             .font(.callout)
             Button("Open Shortcuts") {
@@ -115,52 +186,54 @@ struct ContentView: View {
                 Link("Add the ready-made shortcut", destination: link)
             }
         } header: {
-            Text("Set up the Action Button")
+            Text("Translate any app in one press")
         } footer: {
-            Text("Then press the Action Button while looking at any app. Close Quick Look to go back.")
+            Text("Then press the button while looking at any app. Close Quick Look to go back.")
         }
     }
 
-    private var shoppingSection: some View {
+    private var pricesSection: some View {
         Section {
             Toggle("Convert prices", isOn: $convertPrices)
             if convertPrices {
                 Picker("Show prices in", selection: $currency) {
-                    ForEach(DisplayCurrency.allCases) { currency in
-                        Text(currency.rawValue).tag(currency)
+                    ForEach(DisplayCurrency.codes, id: \.self) { code in
+                        Text(code).tag(code)
                     }
                 }
-                LabeledContent("Extra costs per item (\(source.homeCurrency))") {
+                LabeledContent("Extra cost per item (\(currency))") {
                     TextField("0", value: $extraCost, format: .number)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 120)
                 }
             }
-            if source == .japanese {
-                Toggle("Explain condition words", isOn: $flagListingTerms)
+            if source == nil || source == .japanese {
+                Toggle("Explain Japanese shopping terms", isOn: $flagListingTerms)
             }
         } header: {
-            Text("Shopping")
+            Text("Prices and shopping")
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 if convertPrices {
-                    Text("Prices like ¥12,800 or 1万2000円 get an estimate in \(currency.rawValue) underneath. Extra costs, such as a proxy service fee or domestic shipping, are added to each price for a \"with fees\" total.")
+                    Text("Prices like $19.99, 12,50 €, ¥12,800, 1万2000円 or ₹499 get an estimate in \(currency) underneath. An extra cost, such as shipping or a proxy-service fee, adds a \"with fees\" total.")
                     if let ratesUpdated {
                         Text("Rates updated \(ratesUpdated.formatted(date: .abbreviated, time: .shortened)). [Rates by Exchange Rate API](https://www.exchangerate-api.com)")
                     } else {
                         Text("Rates download once and are reused for 12 hours. [Rates by Exchange Rate API](https://www.exchangerate-api.com)")
                     }
                 }
-                if source == .japanese, flagListingTerms {
-                    Text("Words like ジャンク (junk), 傷あり (scratched) or 海外版 (overseas edition) get a plain-English note, and the panel gets an orange border.")
+                if (source == nil || source == .japanese), flagListingTerms {
+                    Text("Listing words like ジャンク (junk), 傷あり (scratched) or 海外版 (overseas edition) get a plain-English note, and the panel gets an orange border.")
                 }
             }
         }
-        .task(id: "\(convertPrices)\(source.rawValue)\(currency.rawValue)") {
+        .task(id: "\(convertPrices)\(currency)") {
             guard convertPrices else { return }
-            _ = await ExchangeRates.rate(from: source.homeCurrency, to: currency.rawValue)
-            ratesUpdated = ExchangeRates.lastUpdated(for: source.homeCurrency)
+            // Warm the cache for the most common case so the first translation is instant.
+            let base = currency == "USD" ? "EUR" : "USD"
+            _ = await ExchangeRates.rate(from: base, to: currency)
+            ratesUpdated = ExchangeRates.lastUpdated(for: base)
         }
     }
 
@@ -172,75 +245,89 @@ struct ContentView: View {
         }
     }
 
-    private var testSection: some View {
-        Section {
-            PhotosPicker(selection: $pickerItem, matching: .screenshots) {
-                Label("Choose a screenshot to test", systemImage: "photo.on.rectangle")
-            }
-            .disabled(isTranslating)
-            if isTranslating {
-                ProgressView("Reading and translating…")
-            }
-            if let testError {
-                Text(testError).font(.footnote).foregroundStyle(.red)
-            }
-        } header: {
-            Text("Try it")
-        }
-        .onChange(of: pickerItem) { _, item in
-            guard let item else { return }
-            Task { await translatePicked(item) }
-        }
-    }
-
     // MARK: - Actions
 
     private func refreshStatus() async {
         status = nil
-        status = await Translator.status(from: source, to: target)
+        guard statusSource != target else { return }
+        status = await Translator.status(from: statusSource, to: target)
     }
 
     private func downloadLanguages() {
-        if translationConfig?.source == source.localeLanguage, translationConfig?.target == target.localeLanguage {
+        if translationConfig?.source == statusSource.localeLanguage, translationConfig?.target == target.localeLanguage {
             translationConfig?.invalidate()
         } else {
-            translationConfig = TranslationSession.Configuration(source: source.localeLanguage, target: target.localeLanguage)
+            translationConfig = TranslationSession.Configuration(source: statusSource.localeLanguage, target: target.localeLanguage)
         }
     }
 
-    private func translatePicked(_ item: PhotosPickerItem) async {
+    private func translate(_ data: Data, skipStatusBar: Bool) async {
         isTranslating = true
-        testError = nil
-        defer {
-            isTranslating = false
-            pickerItem = nil
-        }
+        translateError = nil
+        defer { isTranslating = false }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                throw ScreenTranslateError.unreadableImage
-            }
-            let rendered = try await ScreenTranslator.translate(data, settings: .current)
+            var settings = TranslationSettings.current
+            settings.skipStatusBar = skipStatusBar
+            let rendered = try await ScreenTranslator.translate(data, settings: settings)
             if rendered.regions.isEmpty {
-                testError = "No \(source.displayName) text was found in that screenshot."
+                translateError = "No text to translate was found in that image."
             }
             if keepHistory, !rendered.regions.isEmpty {
                 try? HistoryStore().add(rendered)
             }
-            shownResult = ShownResult(png: rendered.png, regions: rendered.regions)
+            shownResult = ShownResult(png: rendered.png, regions: rendered.regions, target: rendered.target)
+        } catch let error as ScreenTranslateError {
+            translateError = error.localizedDescription
+            // Point the download row at the missing language so one tap fixes it.
+            if let pair = error.missingPair, source == nil {
+                downloadSource = pair.0
+            }
         } catch {
-            testError = error.localizedDescription
+            translateError = error.localizedDescription
         }
     }
 }
 
-/// A translation to open from the test section, usable with `navigationDestination(item:)`.
+/// A translation to open from the Translate section, usable with `navigationDestination(item:)`.
 struct ShownResult: Hashable {
     let id = UUID()
     let png: Data
     let regions: [TranslatedRegion]
+    let target: AppLanguage
 
     static func == (lhs: ShownResult, rhs: ShownResult) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+/// Takes one photo with the camera and hands it back as JPEG data (nil if cancelled).
+struct CameraPicker: UIViewControllerRepresentable {
+    let onFinish: (Data?) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onFinish: (Data?) -> Void
+
+        init(onFinish: @escaping (Data?) -> Void) { self.onFinish = onFinish }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            let image = info[.originalImage] as? UIImage
+            onFinish(image?.jpegData(compressionQuality: 0.9))
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onFinish(nil)
+        }
+    }
 }
 
 enum AppLinks {

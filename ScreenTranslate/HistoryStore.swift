@@ -3,7 +3,7 @@ import Foundation
 struct HistoryItem: Codable, Identifiable {
     let id: UUID
     let date: Date
-    let source: SourceLanguage
+    let target: AppLanguage
     let regions: [TranslatedRegion]
 
     var fileName: String { "\(id.uuidString).png" }
@@ -29,7 +29,7 @@ struct HistoryStore {
     }
 
     func add(_ result: RenderedTranslation) throws {
-        let item = HistoryItem(id: UUID(), date: Date(), source: result.source, regions: result.regions)
+        let item = HistoryItem(id: UUID(), date: Date(), target: result.target, regions: result.regions)
         try result.png.write(to: directory.appendingPathComponent(item.fileName), options: .completeFileProtectionUntilFirstUserAuthentication)
 
         var items = [item] + load()

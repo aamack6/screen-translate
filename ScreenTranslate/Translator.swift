@@ -9,7 +9,7 @@ enum LanguageStatus {
 
 /// Wraps Apple's on-device Translation framework. Nothing is sent to a server.
 enum Translator {
-    static func status(from source: SourceLanguage, to target: TargetLanguage) async -> LanguageStatus {
+    static func status(from source: AppLanguage, to target: AppLanguage) async -> LanguageStatus {
         let status = await LanguageAvailability().status(from: source.localeLanguage, to: target.localeLanguage)
         switch status {
         case .installed: return .installed
@@ -22,7 +22,7 @@ enum Translator {
     /// Translates the texts in one batch and returns them in the same order.
     /// The languages must already be downloaded (see `ContentView`'s Download button),
     /// because the Shortcuts action can't show Apple's download prompt.
-    static func translate(_ texts: [String], from source: SourceLanguage, to target: TargetLanguage) async throws -> [String] {
+    static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
 
         let session = TranslationSession(installedSource: source.localeLanguage, target: target.localeLanguage)

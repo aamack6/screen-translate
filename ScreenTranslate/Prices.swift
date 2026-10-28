@@ -1,59 +1,122 @@
 import Foundation
 
-/// Finds prices such as ¥12,800, 12,800円, 1万2000円, 3.5万円, 150元, NT$990 or 25,000원.
+struct FoundPrice: Equatable {
+    let amount: Double
+    /// ISO currency code, such as "JPY".
+    let currency: String
+}
+
+/// Finds prices such as $19.99, 12,50 €, £8, ¥12,800, 12,800円, 1万2000円, 150元, NT$990,
+/// 25,000원, ₹499 or 1 200 ₽.
 enum PriceParser {
-    static func prices(in text: String, language: SourceLanguage) -> [Double] {
+    private static let prefixSymbols: [(String, String)] = [
+        ("NT$", "TWD"), ("HK$", "HKD"), ("US$", "USD"), ("A$", "AUD"), ("C$", "CAD"), ("S$", "SGD"), ("R$", "BRL"),
+        ("$", "USD"), ("€", "EUR"), ("£", "GBP"), ("¥", "yen"), ("₩", "KRW"), ("₽", "RUB"), ("₴", "UAH"),
+        ("฿", "THB"), ("₫", "VND"), ("₹", "INR"), ("₺", "TRY"), ("₱", "PHP"), ("Rp", "IDR"),
+    ]
+
+    private static let suffixSymbols: [(String, String)] = [
+        ("円", "JPY"), ("元", "yuan"), ("块", "CNY"), ("원", "KRW"), ("€", "EUR"), ("£", "GBP"), ("₽", "RUB"),
+        ("руб", "RUB"), ("₴", "UAH"), ("грн", "UAH"), ("บาท", "THB"), ("฿", "THB"), ("₫", "VND"), ("đ", "VND"),
+        ("₹", "INR"), ("₺", "TRY"), ("TL", "TRY"), ("zł", "PLN"), ("kr", "SEK"),
+        ("USD", "USD"), ("EUR", "EUR"), ("GBP", "GBP"), ("JPY", "JPY"), ("CNY", "CNY"), ("KRW", "KRW"),
+    ]
+
+    /// - Parameter language: the text's language, used only to tell what ¥ and 元 mean.
+    static func prices(in text: String, language: AppLanguage?) -> [FoundPrice] {
         // NFKC turns full-width digits, commas and ￥ into their plain forms.
         let normalized = text.precomposedStringWithCompatibilityMapping
-        let patterns: [String]
-        switch language {
-        case .japanese:
-            patterns = [
-                #"¥\s*([0-9][0-9,]*)"#,
-                #"(?:([0-9]+(?:\.[0-9]+)?)万)?([0-9][0-9,]*)?\s*円"#,
-            ]
-        case .chineseSimplified:
-            patterns = [
-                #"[¥]\s*([0-9][0-9,]*(?:\.[0-9]+)?)"#,
-                #"(?:([0-9]+(?:\.[0-9]+)?)万)?([0-9][0-9,]*(?:\.[0-9]+)?)?\s*(?:元|块)"#,
-            ]
-        case .chineseTraditional:
-            patterns = [
-                #"NT\$\s*([0-9][0-9,]*(?:\.[0-9]+)?)"#,
-                #"(?:([0-9]+(?:\.[0-9]+)?)萬)?([0-9][0-9,]*(?:\.[0-9]+)?)?\s*元"#,
-            ]
-        case .korean:
-            patterns = [
-                #"₩\s*([0-9][0-9,]*)"#,
-                #"(?:([0-9]+(?:\.[0-9]+)?)만)?\s*([0-9][0-9,]*)?\s*원"#,
-            ]
+        let yen = language?.yenCurrency ?? "JPY"
+        var found: [(range: NSRange, price: FoundPrice)] = []
+
+        func add(_ range: NSRange, _ amount: Double?, _ code: String) {
+            guard let amount, amount > 0 else { return }
+            guard !found.contains(where: { NSIntersectionRange($0.range, range).length > 0 }) else { return }
+            let currency = code == "yen" ? yen : (code == "yuan" ? (yen == "JPY" ? "CNY" : yen) : code)
+            found.append((range, FoundPrice(amount: amount, currency: currency)))
         }
 
-        var results: [Double] = []
-        let range = NSRange(normalized.startIndex..., in: normalized)
-        for (index, pattern) in patterns.enumerated() {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-            for match in regex.matches(in: normalized, range: range) {
-                let value: Double?
-                if index == 0 {
-                    value = number(group: 1, of: match, in: normalized)
-                } else {
-                    // Second pattern: an optional "ten thousands" part plus an optional remainder.
-                    let tenThousands = number(group: 1, of: match, in: normalized)
-                    let rest = number(group: 2, of: match, in: normalized)
-                    value = (tenThousands == nil && rest == nil) ? nil : (tenThousands ?? 0) * 10_000 + (rest ?? 0)
-                }
-                if let value, value > 0 {
-                    results.append(value)
-                }
+        // Digits with optional thousands groups (12,800 / 1.234 / 1 200) and an optional decimal part.
+        let number = #"([0-9]{1,3}(?:[,.\x{00A0}\x{202F} ][0-9]{3})+(?:[.,][0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)"#
+
+        // East Asian "ten thousand" amounts first (1万2000円, 3.5万元, 2만 5000원), so the
+        // remainder isn't also read as a separate price.
+        for (unit, code) in [("[万萬]", "yen"), ("만", "KRW")] {
+            let pattern = #"([0-9]+(?:\.[0-9]+)?)\#(unit)\s*([0-9][0-9,]*)?\s*(円|元|원)?"#
+            for match in matches(pattern, in: normalized) {
+                let tenThousands = Double(group(1, match, normalized) ?? "")
+                let rest = Double((group(2, match, normalized) ?? "0").replacingOccurrences(of: ",", with: ""))
+                let suffix = group(3, match, normalized)
+                guard tenThousands != nil, suffix != nil || code == "KRW" else { continue }
+                let currency = suffix == "円" ? "JPY" : (suffix == "元" ? "yuan" : code)
+                add(match.range, (tenThousands ?? 0) * 10_000 + (rest ?? 0), currency)
             }
         }
-        return results
+
+        for (symbol, code) in prefixSymbols {
+            let pattern = NSRegularExpression.escapedPattern(for: symbol) + #"\s?"# + number
+            for match in matches(pattern, in: normalized) {
+                add(match.range, parseNumber(group(1, match, normalized)), code)
+            }
+        }
+
+        for (symbol, code) in suffixSymbols {
+            // Letters-only symbols (TL, kr, USD) need a word boundary so "1 TLC" isn't a price.
+            let boundary = symbol.allSatisfy(\.isLetter) && symbol.allSatisfy(\.isASCII) ? #"\b"# : ""
+            let pattern = number + #"\s?"# + NSRegularExpression.escapedPattern(for: symbol) + boundary
+            for match in matches(pattern, in: normalized) {
+                add(match.range, parseNumber(group(1, match, normalized)), code)
+            }
+        }
+
+        return found.sorted { $0.range.location < $1.range.location }.map(\.price)
     }
 
-    private static func number(group: Int, of match: NSTextCheckingResult, in text: String) -> Double? {
-        guard let range = Range(match.range(at: group), in: text) else { return nil }
-        return Double(text[range].replacingOccurrences(of: ",", with: ""))
+    /// Reads "12,800", "1.234,56", "12,50", "1 200" and "19.99" the way people mean them.
+    static func parseNumber(_ raw: String?) -> Double? {
+        guard var text = raw?.trimmingCharacters(in: .whitespaces) else { return nil }
+        text = text.replacingOccurrences(of: "\u{00A0}", with: "")
+            .replacingOccurrences(of: "\u{202F}", with: "")
+            .replacingOccurrences(of: " ", with: "")
+
+        let lastComma = text.lastIndex(of: ",")
+        let lastDot = text.lastIndex(of: ".")
+        switch (lastComma, lastDot) {
+        case let (comma?, dot?):
+            // Both used: whichever comes last is the decimal separator.
+            if comma > dot {
+                text = text.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+            } else {
+                text = text.replacingOccurrences(of: ",", with: "")
+            }
+        case let (comma?, nil):
+            // "12,50" is a decimal; "12,800" and "1,234,567" are thousands.
+            let decimals = text.distance(from: comma, to: text.endIndex) - 1
+            let commas = text.filter { $0 == "," }.count
+            text = (decimals == 2 && commas == 1)
+                ? text.replacingOccurrences(of: ",", with: ".")
+                : text.replacingOccurrences(of: ",", with: "")
+        case let (nil, dot?):
+            // "1.234" and "1.234.567" are thousands (European style); "19.99" is a decimal.
+            let decimals = text.distance(from: dot, to: text.endIndex) - 1
+            let dots = text.filter { $0 == "." }.count
+            if dots > 1 || decimals == 3 {
+                text = text.replacingOccurrences(of: ".", with: "")
+            }
+        case (nil, nil):
+            break
+        }
+        return Double(text)
+    }
+
+    private static func matches(_ pattern: String, in text: String) -> [NSTextCheckingResult] {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        return regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+    }
+
+    private static func group(_ index: Int, _ match: NSTextCheckingResult, _ text: String) -> String? {
+        guard index < match.numberOfRanges, let range = Range(match.range(at: index), in: text) else { return nil }
+        return String(text[range])
     }
 }
 
