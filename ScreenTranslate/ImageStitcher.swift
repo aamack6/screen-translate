@@ -74,8 +74,7 @@ enum ImageStitcher {
         let height: Int
 
         init?(_ image: CGImage, width: Int) {
-            self.width = width
-            height = max(Int((Double(image.height) * Double(width) / Double(image.width)).rounded()), 1)
+            let height = max(Int((Double(image.height) * Double(width) / Double(image.width)).rounded()), 1)
             var pixels = [UInt8](repeating: 0, count: width * height)
             let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
                 guard let context = CGContext(
@@ -87,6 +86,8 @@ enum ImageStitcher {
                 return true
             }
             guard drawn else { return nil }
+            self.width = width
+            self.height = height
             self.pixels = pixels
         }
 

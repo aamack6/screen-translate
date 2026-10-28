@@ -496,11 +496,11 @@ struct ContentView: View {
             }
             shownResult = ShownResult(
                 jpeg: rendered.jpeg,
-                timings: rendered.timings,
                 regions: rendered.regions,
                 target: rendered.target,
                 imageData: data,
-                skipStatusBar: settings.skipStatusBar
+                skipStatusBar: settings.skipStatusBar,
+                timings: rendered.timings
             )
         } catch let error as ScreenTranslateError {
             translateError = error.localizedDescription
