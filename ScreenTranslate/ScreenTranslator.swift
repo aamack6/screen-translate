@@ -118,6 +118,7 @@ enum ScreenTranslator {
         }
         // The real translation reuses the warmed-up session; don't run both at once.
         await warmUp.value
+        finishStep("Load")
         let translations = try await translateBlocks(blocks, originals: originals, target: settings.target)
         finishStep("Translate")
         let rates = await priceRates(for: originals, blocks: blocks, settings: settings)
@@ -168,18 +169,19 @@ enum ScreenTranslator {
         let byLanguage = Dictionary(grouping: blocks.indices.filter { blocks[$0].language != nil }) { blocks[$0].language! }
 
         for (source, indices) in byLanguage.sorted(by: { $0.value.count > $1.value.count }) {
-            switch await Translator.status(from: source, to: target) {
-            case .installed: break
-            case .needsDownload: throw ScreenTranslateError.languagesNotDownloaded(source, target)
-            case .unsupported: continue // Leave text Apple can't translate as it is.
-            }
+            // Translate straight away and only ask why when it fails: checking which languages
+            // are downloaded first costs time on every press.
             do {
                 let translated = try await Translator.translate(indices.map { originals[$0] }, from: source, to: target)
                 for (position, index) in indices.enumerated() {
                     results[index] = translated[position]
                 }
             } catch {
-                throw ScreenTranslateError.translationFailed(error.localizedDescription)
+                switch await Translator.status(from: source, to: target) {
+                case .needsDownload: throw ScreenTranslateError.languagesNotDownloaded(source, target)
+                case .unsupported: continue // Leave text Apple can't translate as it is.
+                case .installed: throw ScreenTranslateError.translationFailed(error.localizedDescription)
+                }
             }
         }
         return results

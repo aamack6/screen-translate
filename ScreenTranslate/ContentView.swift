@@ -70,6 +70,7 @@ struct ContentView: View {
                 }
             }
             .task { await store.load() }
+            .task { await Translator.warmUpLikelyPair() }
             .onChange(of: "\(sourceSetting)>\(target.rawValue)") { LiveTranslator.shared.writeConfig() }
             .onChange(of: scenePhase) { _, phase in
                 // The Shortcuts action may have used free translations while the app was closed.

@@ -20,10 +20,17 @@ enum Translator {
     }
 
     /// Loads the translation model for a pair by translating a tiny text, so a translation that
-    /// follows straight after doesn't wait for it. Does nothing if the pair isn't downloaded.
+    /// follows straight after doesn't wait for it. Fails quietly if the pair isn't downloaded.
     static func warmUp(from source: AppLanguage, to target: AppLanguage) async {
-        guard source != target, await status(from: source, to: target) == .installed else { return }
+        guard source != target else { return }
         _ = try? await translate(["OK"], from: source, to: target)
+    }
+
+    /// Warms up the language the user most likely reads next: the chosen one, or with automatic
+    /// detection, the language of the last screenshot.
+    static func warmUpLikelyPair() async {
+        guard let source = AppSettings.sourceLanguage ?? AppSettings.lastDetectedSource else { return }
+        await warmUp(from: source, to: AppSettings.targetLanguage)
     }
 
     /// Translates the texts in one batch and returns them in the same order.

@@ -26,7 +26,7 @@ enum OverlayRenderer {
         var panels: [Panel] = []
         var footnotes: [(number: Int, region: TranslatedRegion)] = []
         for region in regions {
-            var panel = layoutPanel(for: region, minFontSize: minFontSize, maxFontSize: maxFontSize, imageHeight: height)
+            var panel = layoutPanel(for: region, among: regions, minFontSize: minFontSize, maxFontSize: maxFontSize, imageSize: CGSize(width: width, height: height))
             if !panel.fits || options.appendFullText {
                 let number = footnotes.count + 1
                 footnotes.append((number, region))
@@ -90,27 +90,48 @@ enum OverlayRenderer {
     }
 
     /// Picks the largest font that fits the translation in the original text's box. The panel may
-    /// grow downward a little, because English usually needs more room than Japanese.
-    private static func layoutPanel(for region: TranslatedRegion, minFontSize: CGFloat, maxFontSize: CGFloat, imageHeight: CGFloat) -> Panel {
+    /// grow downward a little, because English usually needs more room than Japanese, but never
+    /// into the next text below it. Narrow panels (buttons) widen so no word is split.
+    private static func layoutPanel(for region: TranslatedRegion, among regions: [TranslatedRegion], minFontSize: CGFloat, maxFontSize: CGFloat, imageSize: CGSize) -> Panel {
         let padding = max(region.rect.height * 0.12, minFontSize * 0.3)
         let base = region.rect.insetBy(dx: -padding, dy: -padding * 0.5)
-        let maxHeight = min(base.height * 1.8, imageHeight - base.minY)
-        let textWidth = base.width - padding * 2
+        let nextBelow = regions
+            .map(\.rect)
+            .filter { $0.minY > region.rect.maxY - region.rect.height * 0.25 && $0.minX < region.rect.maxX && $0.maxX > region.rect.minX }
+            .map(\.minY)
+            .min() ?? imageSize.height
+        let maxHeight = max(base.height, min(base.height * 1.8, nextBelow - base.minY - padding * 0.25))
 
         var size = min(maxFontSize, max(region.rect.height * 0.8, minFontSize))
         while size >= minFontSize {
-            let needed = measure(panelText(region, size: size, colors: Colors(dark: false), number: nil), width: textWidth).height + padding
+            let frame = widened(base, toFit: longestWordWidth(region.translated, size: size) + padding * 2, imageWidth: imageSize.width)
+            let needed = measure(panelText(region, size: size, colors: Colors(dark: false), number: nil), width: frame.width - padding * 2).height + padding
             if needed <= maxHeight {
-                var frame = base
-                frame.size.height = max(base.height, ceil(needed))
-                return Panel(frame: frame, region: region, fontSize: size, padding: padding, fits: true)
+                var fitted = frame
+                fitted.size.height = max(base.height, ceil(needed))
+                return Panel(frame: fitted, region: region, fontSize: size, padding: padding, fits: true)
             }
             size *= 0.9
         }
 
-        var frame = base
+        var frame = widened(base, toFit: longestWordWidth(region.translated, size: minFontSize) + padding * 2, imageWidth: imageSize.width)
         frame.size.height = maxHeight
         return Panel(frame: frame, region: region, fontSize: minFontSize, padding: padding, fits: false)
+    }
+
+    /// Grows the frame sideways around its center to at least `width`, staying inside the image.
+    private static func widened(_ frame: CGRect, toFit width: CGFloat, imageWidth: CGFloat) -> CGRect {
+        guard width > frame.width else { return frame }
+        var result = frame.insetBy(dx: -(min(width, imageWidth) - frame.width) / 2, dy: 0)
+        result.origin.x = min(max(result.minX, 0), imageWidth - result.width)
+        return result
+    }
+
+    private static func longestWordWidth(_ text: String, size: CGFloat) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: size, weight: .medium)
+        return text.split(whereSeparator: \.isWhitespace)
+            .map { ceil((String($0) as NSString).size(withAttributes: [.font: font]).width) }
+            .max() ?? 0
     }
 
     // MARK: - Text
