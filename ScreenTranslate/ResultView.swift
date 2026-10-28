@@ -142,11 +142,11 @@ struct HistoryView: View {
         }
         .navigationTitle("History")
         .toolbar {
-            if !items.isEmpty {
-                Button("Clear", role: .destructive) {
-                    try? store.clear()
-                    items = []
-                }
+            // Always shown: it also empties the cache of remembered translations.
+            Button("Clear", role: .destructive) {
+                try? store.clear()
+                TranslationCache.clearAll()
+                items = []
             }
         }
         .onAppear { items = store.load() }
