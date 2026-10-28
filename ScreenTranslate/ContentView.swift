@@ -14,6 +14,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.keepHistory) private var keepHistory = false
     @AppStorage(SettingsKey.onlineEngine) private var onlineEngine: OnlineEngine = .off
     @State private var apiKey = ""
+    @State private var trigger: Trigger = .floatingDot
     @State private var keyCheck: String?
 
     /// With automatic detection, the language whose download the Language section shows.
@@ -251,10 +252,17 @@ struct ContentView: View {
                 Text("2. Add Take Screenshot.")
                 Text("3. Add Translate Screenshot, with the screenshot from step 2.")
                 Text("4. Add Quick Look, showing the result of step 3.")
-                Text("5. Put it on a button:")
-                Text("• Action Button: Settings › Action Button › Shortcut")
-                Text("• Any iPhone: Settings › Accessibility › Touch › Back Tap › Double Tap")
-                Text("• Control Center: edit Control Center › Add a Control › Shortcut")
+            }
+            .font(.callout)
+            Picker("Start it with", selection: $trigger) {
+                ForEach(Trigger.allCases) { trigger in
+                    Text(trigger.name).tag(trigger)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(trigger.steps.enumerated()), id: \.offset) { index, step in
+                    Text("\(index + 5). \(step)")
+                }
             }
             .font(.callout)
             Button("Open Shortcuts") {
@@ -266,7 +274,42 @@ struct ContentView: View {
         } header: {
             Text("Translate any app in one press")
         } footer: {
-            Text("Then press the button while looking at any app. Close Quick Look to go back.")
+            Text("Then press it while looking at any app. Close Quick Look to go back.")
+        }
+    }
+
+    /// Ways iOS lets a shortcut be started from inside any app.
+    enum Trigger: String, CaseIterable, Identifiable {
+        case floatingDot, actionButton, backTap, controlCenter
+
+        var id: String { rawValue }
+
+        var name: String {
+            switch self {
+            case .floatingDot: return "Floating button"
+            case .actionButton: return "Action Button"
+            case .backTap: return "Back Tap"
+            case .controlCenter: return "Control Center"
+            }
+        }
+
+        var steps: [String] {
+            switch self {
+            case .floatingDot: return [
+                "Open Settings › Accessibility › Touch › AssistiveTouch and turn it on. A small button floats on the screen; drag it anywhere.",
+                "Under Custom Actions, set Single-Tap to Screen Translate (shortcuts are near the bottom of the list).",
+                "Optional: lower Idle Opacity so the button almost disappears when you're not using it. It never shows in screenshots.",
+            ]
+            case .actionButton: return [
+                "Open Settings › Action Button, swipe to Shortcut, and choose Screen Translate.",
+            ]
+            case .backTap: return [
+                "Open Settings › Accessibility › Touch › Back Tap › Double Tap and choose Screen Translate. Then tap the back of the iPhone twice.",
+            ]
+            case .controlCenter: return [
+                "Open Control Center, press and hold, tap Add a Control, choose Shortcut, and pick Screen Translate.",
+            ]
+            }
         }
     }
 
