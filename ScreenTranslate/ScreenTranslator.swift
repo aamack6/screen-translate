@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import UIKit
 
 struct RenderedTranslation {
     /// The image with translation panels, as JPEG.
@@ -69,6 +70,24 @@ enum ScreenTranslateError: LocalizedError {
 /// action and by the app's own photo and camera translation.
 enum ScreenTranslator {
     static func translate(_ data: Data, settings: TranslationSettings) async throws -> RenderedTranslation {
+        guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
+        return try await translate(image, settings: settings)
+    }
+
+    /// Joins screenshots taken while scrolling into one long page and translates it as a whole.
+    static func translateJoined(_ screenshots: [Data], settings: TranslationSettings) async throws -> (RenderedTranslation, Data) {
+        let images = screenshots.compactMap(loadImage)
+        guard images.count == screenshots.count, let joined = ImageStitcher.stitch(images) else {
+            throw ScreenTranslateError.unreadableImage
+        }
+        var settings = settings
+        settings.skipStatusBar = false // The joiner already dropped it.
+        let result = try await translate(joined, settings: settings)
+        let joinedData = UIImage(cgImage: joined).jpegData(compressionQuality: 0.9) ?? Data()
+        return (result, joinedData)
+    }
+
+    private static func translate(_ image: CGImage, settings: TranslationSettings) async throws -> RenderedTranslation {
         if settings.countsTowardAllowance {
             try await Usage.checkAllowance()
         }
@@ -89,7 +108,6 @@ enum ScreenTranslator {
             if let likelySource { await Translator.warmUp(from: likelySource, to: settings.target) }
         }
 
-        guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
         let size = CGSize(width: image.width, height: image.height)
 
         // Keep lines that need translating, plus price-only lines like "$12.99" when converting.
@@ -212,10 +230,15 @@ enum ScreenTranslator {
     /// 48 MP photos) are scaled down so they fit in memory.
     private static func loadImage(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        // Joined pages are long but narrow; let them keep their full height.
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let height = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let isLongPage = width > 0 && height > width * 3
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 6000,
+            kCGImageSourceThumbnailMaxPixelSize: isLongPage ? min(height, 20000) : 6000,
         ]
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }

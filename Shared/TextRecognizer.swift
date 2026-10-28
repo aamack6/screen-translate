@@ -3,11 +3,38 @@ import CoreVideo
 import Vision
 
 enum TextRecognizer {
-    /// Finds lines of text in the image with Vision's on-device recognizer.
+    /// Finds lines of text in the image with Vision's on-device recognizer. Images much taller
+    /// than a screen (joined screenshots) are read one screen-sized slice at a time, since Vision
+    /// shrinks very tall images until small text can't be read.
     /// - Parameter language: the language to read, or nil to let Vision detect it.
     static func recognizeLines(in image: CGImage, language: AppLanguage?) throws -> [TextLine] {
-        let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
-        return try recognizeLines(with: handler, imageSize: CGSize(width: image.width, height: image.height), language: language)
+        let width = CGFloat(image.width), height = CGFloat(image.height)
+        let sliceHeight = (width * 2.2).rounded()
+        guard height > sliceHeight * 1.2 else {
+            let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
+            return try recognizeLines(with: handler, imageSize: CGSize(width: width, height: height), language: language)
+        }
+
+        // Slices overlap so no line is cut in two; a line belongs to the slice holding its middle.
+        let overlap = (width * 0.15).rounded()
+        var lines: [TextLine] = []
+        var top: CGFloat = 0
+        while top < height {
+            let bottom = min(top + sliceHeight, height)
+            guard let slice = image.cropping(to: CGRect(x: 0, y: top, width: width, height: bottom - top)) else { break }
+            let handler = VNImageRequestHandler(cgImage: slice, orientation: .up, options: [:])
+            let ownedTop = top == 0 ? 0 : top + overlap / 2
+            let ownedBottom = bottom >= height ? height : bottom - overlap / 2
+            for line in try recognizeLines(with: handler, imageSize: CGSize(width: width, height: bottom - top), language: language) {
+                let rect = line.rect.offsetBy(dx: 0, dy: top)
+                if rect.midY >= ownedTop, rect.midY < ownedBottom {
+                    lines.append(TextLine(text: line.text, rect: rect))
+                }
+            }
+            if bottom >= height { break }
+            top = bottom - overlap
+        }
+        return lines
     }
 
     /// Same, for a frame of the screen broadcast. Rects are in the frame as the user sees it,

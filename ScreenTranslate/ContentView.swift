@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var ratesUpdated: Date?
 
     @State private var pickerItem: PhotosPickerItem?
+    @State private var joinItems: [PhotosPickerItem] = []
     @State private var showCamera = false
     @State private var isTranslating = false
     @State private var shownResult: ShownResult?
@@ -95,6 +96,9 @@ struct ContentView: View {
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Label("Translate a photo or screenshot", systemImage: "photo.on.rectangle")
             }
+            PhotosPicker(selection: $joinItems, maxSelectionCount: 8, selectionBehavior: .ordered, matching: .images) {
+                Label("Join screenshots into one page", systemImage: "rectangle.stack")
+            }
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button {
                     showCamera = true
@@ -111,7 +115,7 @@ struct ContentView: View {
         } header: {
             Text("Translate")
         } footer: {
-            Text("Menus, signs, documents, games, chats, shopping sites: anything with text. For other apps, set up the one-press shortcut below.")
+            Text("Menus, signs, documents, games, chats, shopping sites: anything with text. For a long page, take a screenshot, scroll a bit, take another, and so on, then join them: pick them top to bottom and they become one scrollable translation. For other apps, set up the one-press shortcut below.")
         }
         .disabled(isTranslating)
         .onChange(of: pickerItem) { _, item in
@@ -123,6 +127,21 @@ struct ContentView: View {
                     return
                 }
                 await translate(data, skipStatusBar: true)
+            }
+        }
+        .onChange(of: joinItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task {
+                defer { joinItems = [] }
+                var screenshots: [Data] = []
+                for item in items {
+                    guard let data = try? await item.loadTransferable(type: Data.self) else {
+                        translateError = ScreenTranslateError.unreadableImage.localizedDescription
+                        return
+                    }
+                    screenshots.append(data)
+                }
+                await translateJoined(screenshots)
             }
         }
     }
@@ -322,6 +341,16 @@ struct ContentView: View {
         await run(data, settings: settings)
     }
 
+    /// Joins screenshots taken while scrolling into one page and translates it. A retry then
+    /// works on the joined page like on any other image.
+    private func translateJoined(_ screenshots: [Data]) async {
+        var settings = TranslationSettings.current
+        settings.skipStatusBar = false
+        await run(settings: settings) {
+            try await ScreenTranslator.translateJoined(screenshots, settings: settings)
+        }
+    }
+
     /// Translates the same image again from a language the user picked, when detection got it wrong.
     /// A retry doesn't use up a free translation.
     private func retranslate(_ result: ShownResult, from language: AppLanguage) async {
@@ -333,6 +362,13 @@ struct ContentView: View {
     }
 
     private func run(_ data: Data, settings: TranslationSettings) async {
+        await run(settings: settings) {
+            (try await ScreenTranslator.translate(data, settings: settings), data)
+        }
+    }
+
+    /// - Parameter perform: translates, returning the result and the image it was made from.
+    private func run(settings: TranslationSettings, perform: () async throws -> (RenderedTranslation, Data)) async {
         isTranslating = true
         translateError = nil
         defer {
@@ -340,7 +376,7 @@ struct ContentView: View {
             remainingFree = Usage.remainingToday
         }
         do {
-            let rendered = try await ScreenTranslator.translate(data, settings: settings)
+            let (rendered, data) = try await perform()
             if rendered.regions.isEmpty {
                 translateError = "No text to translate was found in that image."
             }

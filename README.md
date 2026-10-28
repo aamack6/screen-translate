@@ -71,7 +71,8 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | --- | --- |
 | `TranslateScreenshotIntent.swift` | The **Translate Screenshot** action in Shortcuts |
 | `ScreenTranslator.swift` | The pipeline: decode image → find text → group lines → translate → draw |
-| `TextRecognizer.swift` | Vision text recognition for the chosen language, or with automatic detection |
+| `TextRecognizer.swift` | Vision text recognition for the chosen language, or with automatic detection; long joined pages are read in screen-sized slices |
+| `ImageStitcher.swift` | Joins screenshots taken while scrolling into one long page, dropping fixed headers and the overlap |
 | `LanguageDetector.swift` | Decides per line whether to translate and from which language |
 | `TextGeometry.swift` | Coordinate conversion, status-bar filter, joining wrapped lines into paragraphs |
 | `Translator.swift` | Apple's on-device Translation (language status and batch translation) |
