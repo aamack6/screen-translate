@@ -12,6 +12,9 @@ struct ContentView: View {
     @AppStorage(SettingsKey.darkPanels) private var darkPanels = false
     @AppStorage(SettingsKey.appendFullText) private var appendFullText = false
     @AppStorage(SettingsKey.keepHistory) private var keepHistory = false
+    @AppStorage(SettingsKey.onlineEngine) private var onlineEngine: OnlineEngine = .off
+    @State private var apiKey = ""
+    @State private var keyCheck: String?
 
     /// With automatic detection, the language whose download the Language section shows.
     @State private var downloadSource: AppLanguage = .japanese
@@ -45,6 +48,7 @@ struct ContentView: View {
                 liveSection
                 proSection
                 languageSection
+                engineSection
                 setupSection
                 pricesSection
                 optionsSection
@@ -308,6 +312,55 @@ struct ContentView: View {
             let base = currency == "USD" ? "EUR" : "USD"
             _ = await ExchangeRates.rate(from: base, to: currency)
             ratesUpdated = ExchangeRates.lastUpdated(for: base)
+        }
+    }
+
+    private var engineSection: some View {
+        Section {
+            Picker("Engine", selection: $onlineEngine) {
+                ForEach(OnlineEngine.allCases) { engine in
+                    Text(engine.displayName).tag(engine)
+                }
+            }
+            if onlineEngine != .off {
+                SecureField(onlineEngine == .deepL ? "DeepL API key" : "Google Cloud API key", text: $apiKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit(saveKey)
+                Button("Save and test key", action: saveKey)
+                    .disabled(apiKey.isEmpty)
+                if let keyCheck {
+                    Text(keyCheck).font(.footnote).foregroundStyle(keyCheck.hasPrefix("✓") ? Color.green : Color.red)
+                }
+            }
+        } header: {
+            Text("Translation engine")
+        } footer: {
+            if onlineEngine == .off {
+                Text("Apple's engine works offline and keeps everything on this iPhone, but takes about two seconds for new text. An online engine answers in a fraction of a second.")
+            } else if !store.isPro {
+                Text("Online engines are part of Pro.")
+            } else {
+                Text("Uses your own key, so you pay the service directly (both have a free monthly allowance). Only the text read from the screen is sent, never the image. Without a connection, Apple's engine is used.")
+            }
+        }
+        .onAppear { apiKey = APIKeyStore.key(for: onlineEngine) ?? "" }
+        .onChange(of: onlineEngine) { _, engine in
+            apiKey = APIKeyStore.key(for: engine) ?? ""
+            keyCheck = nil
+        }
+    }
+
+    private func saveKey() {
+        let engine = onlineEngine
+        APIKeyStore.setKey(apiKey, for: engine)
+        keyCheck = "Testing…"
+        Task {
+            if let error = await OnlineTranslator.test(engine) {
+                keyCheck = error
+            } else {
+                keyCheck = "✓ Key works"
+            }
         }
     }
 

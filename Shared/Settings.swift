@@ -176,6 +176,7 @@ enum SettingsKey {
     static let appendFullText = "appendFullText"
     static let keepHistory = "keepHistory"
     static let lastDetectedSource = "lastDetectedSource"
+    static let onlineEngine = "onlineEngine"
 }
 
 /// Stored source-language value meaning "detect the language automatically".

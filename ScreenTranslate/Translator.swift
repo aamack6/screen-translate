@@ -7,7 +7,8 @@ enum LanguageStatus {
     case unsupported
 }
 
-/// Wraps Apple's on-device Translation framework. Nothing is sent to a server.
+/// Wraps Apple's on-device Translation framework, or the online engine when the user has set
+/// one up (see `OnlineTranslator`). With Apple's, nothing is sent to a server.
 enum Translator {
     static func status(from source: AppLanguage, to target: AppLanguage) async -> LanguageStatus {
         let status = await LanguageAvailability().status(from: source.localeLanguage, to: target.localeLanguage)
@@ -23,7 +24,7 @@ enum Translator {
     /// follows straight after doesn't wait for it. Fails quietly if the pair isn't downloaded.
     static func warmUp(from source: AppLanguage, to target: AppLanguage) async {
         guard source != target else { return }
-        _ = try? await translateWithEngine(["OK"], from: source, to: target)
+        _ = try? await translateWithEngine(["OK"], from: source, to: target, engine: OnlineEngine.active)
     }
 
     /// Warms up the language the user most likely reads next: the chosen one, or with automatic
@@ -39,11 +40,12 @@ enum Translator {
     /// The languages must already be downloaded (see `ContentView`'s Download button),
     /// because the Shortcuts action can't show Apple's download prompt.
     static func translate(_ texts: [String], from source: AppLanguage, to target: AppLanguage) async throws -> [String] {
-        let cache = TranslationCache(source: source, target: target)
+        let engine = OnlineEngine.active
+        let cache = TranslationCache(source: source, target: target, engine: engine)
         var known = cache.load()
         let new = Array(Set(texts.filter { known[$0] == nil }))
         if !new.isEmpty {
-            let translated = try await translateWithEngine(new, from: source, to: target)
+            let translated = try await translateWithEngine(new, from: source, to: target, engine: engine)
             for (original, translation) in zip(new, translated) {
                 known[original] = translation
             }
@@ -52,8 +54,13 @@ enum Translator {
         return texts.map { known[$0] ?? $0 }
     }
 
-    private static func translateWithEngine(_ texts: [String], from source: AppLanguage, to target: AppLanguage) async throws -> [String] {
+    /// The online engine falls back to Apple's when it fails (no signal, key used up), so a
+    /// press never ends in an error the on-device engine could have handled.
+    private static func translateWithEngine(_ texts: [String], from source: AppLanguage, to target: AppLanguage, engine: OnlineEngine?) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
+        if let engine, let translated = try? await OnlineTranslator.translate(texts, from: source, to: target, engine: engine) {
+            return translated
+        }
 
         let session = await SessionCache.shared.session(from: source, to: target)
         let requests = texts.enumerated().map { index, text in
@@ -96,12 +103,13 @@ struct TranslationCache {
         if let directory { try? FileManager.default.removeItem(at: directory) }
     }
 
-    init(source: AppLanguage, target: AppLanguage) {
+    /// Each engine keeps its own memory, so switching engines doesn't show the old engine's wording.
+    init(source: AppLanguage, target: AppLanguage, engine: OnlineEngine? = nil) {
         let directory = Self.directory
         if let directory {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        let name = "\(source.rawValue)-\(target.rawValue)"
+        let name = (engine.map { "\($0.rawValue)-" } ?? "") + "\(source.rawValue)-\(target.rawValue)"
         url = directory?.appendingPathComponent("\(name).json")
         orderURL = directory?.appendingPathComponent("\(name)-order.json")
     }

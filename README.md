@@ -75,7 +75,8 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 | `ImageStitcher.swift` | Joins screenshots taken while scrolling into one long page, dropping fixed headers and the overlap |
 | `LanguageDetector.swift` | Decides per line whether to translate and from which language |
 | `TextGeometry.swift` | Coordinate conversion, status-bar filter, joining wrapped lines into paragraphs |
-| `Translator.swift` | Apple's on-device Translation (language status and batch translation) |
+| `Translator.swift` | Apple's on-device Translation (language status and batch translation), with a cache of recent translations |
+| `OnlineTranslator.swift` | Optional DeepL or Google engine with the user's own API key (Pro), falling back to Apple's |
 | `OverlayRenderer.swift` | Draws the translation panels; long translations get a number and a footnote under the image |
 | `Prices.swift` | Finds prices in about 20 currencies and fetches/caches exchange rates |
 | `ListingTerms.swift` | Japanese marketplace condition words and their meanings |

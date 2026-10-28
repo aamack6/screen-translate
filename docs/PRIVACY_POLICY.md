@@ -4,6 +4,9 @@ ScreenTranslate does not collect, store on a server, or share any personal data.
 
 - Screenshots, photos and camera shots you translate are processed on your device by Apple's Vision and
   Translation frameworks. They are never uploaded. The camera is only used when you tap "Translate with the camera".
+- If you choose an online translation engine (DeepL or Google) and enter your own API key, the text read from the
+  screen, but never the image, is sent to that service to be translated, under its own privacy policy. The key is
+  kept in your device's Keychain. With the default engine, nothing leaves your device.
 - Screenshots are not saved to your photo library unless you choose to save or share a result.
 - If you turn on History, recent translations are kept in the app's private storage on your device. Turning it off
   or tapping Clear deletes them. Deleting the app deletes them too.
