@@ -419,7 +419,11 @@ struct ContentView: View {
                 Text("Uses your own key, so you pay the service directly (both have a free monthly allowance). Only the text read from the screen is sent, never the image. Without a connection, Apple's engine is used.")
             }
         }
-        .onAppear { apiKey = APIKeyStore.key(for: onlineEngine) ?? "" }
+        .onAppear {
+            apiKey = APIKeyStore.key(for: onlineEngine) ?? ""
+            // Engines chosen before consent was asked for need it once.
+            if onlineEngine != .off, !onlineEngine.hasConsent { consentEngine = onlineEngine }
+        }
         .onChange(of: onlineEngine) { _, engine in
             apiKey = APIKeyStore.key(for: engine) ?? ""
             keyCheck = nil
