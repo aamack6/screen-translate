@@ -1,0 +1,38 @@
+{
+  "identifier" : "5C5E7A01",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : true,
+      "internalID" : "6739000001",
+      "localizations" : [
+        {
+          "description" : "Unlimited translations, online engines and shopping mode. One purchase, no subscription.",
+          "displayName" : "ScreenTranslate Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.aamack6.ScreenTranslate.pro",
+      "referenceName" : "Pro (local test only)",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
