@@ -18,8 +18,17 @@ key, and images never leave the phone.
   12 hours, and the request contains only a currency code.
 - **Fair pricing:** 10 free translations a day, then one purchase for unlimited use. No ads, coins or subscription.
 - **Wrong language?** Every result shows "Japanese → English"; tap it to translate again from another language.
-- **Japanese shopping terms** (on by default when reading Japanese): ジャンク, 傷あり, 海外版, オリパ, 空箱 and about 30
-  other listing words get a plain-English note, and warning terms give the panel an orange border.
+- **Japanese shopping listings** (on by default when reading Japanese): about 90 listing phrases (condition grades,
+  damage, what's included, one item vs the whole lot, shipping and cash on delivery, pre-orders, stock photos,
+  authenticity wording, returns, collector terms) get a plain-English note that names the Japanese phrase it comes
+  from, and "傷なし"-style negations are read as the seller saying no. A buying summary under the result groups them
+  by question and lists what the screen doesn't say. It explains the seller's wording; it never says whether an item
+  is genuine or in the condition claimed.
+- **Check what it read:** text Vision wasn't sure of is marked "(?)" with a dashed border. Tap any translation to see
+  and correct the Japanese it came from and translate again, switch between Translated, Original and Text only, or
+  select an area to translate just that part.
+- **Private by default:** online engines are off until you add your own key and agree to send text; there is no
+  silent switch to the cloud, and images are never sent. History and the translation memory can each be turned off.
 
 This is a rebuild of an earlier ChatGPT-made prototype whose source was lost. It keeps the same design (a Shortcuts
 action fed by Take Screenshot) and adds the features above and a cleaner layout engine.
@@ -52,7 +61,9 @@ If the project won't open, regenerate it with [XcodeGen](https://github.com/yona
    **Take Screenshot** → **Translate Screenshot** (Screenshot = the result of Take Screenshot) → **Quick Look**.
 3. Put it on a button: Settings › Action Button › Shortcut (iPhone 15 Pro and newer), or on any iPhone
    Settings › Accessibility › Touch › Back Tap › Double Tap, or a Shortcut control in Control Center.
-4. Open any app with foreign text and press the button.
+4. Open any app with foreign text and press the button. Quick Look shows the result; swipe down to go back.
+   To tap translations, correct text or select an area, use the **Translate Screenshot in App** action instead of
+   Translate Screenshot (and leave out Quick Look): the result opens in ScreenTranslate.
 
 ### Live mode
 
@@ -92,10 +103,16 @@ in `ContentView.swift`. The app then shows a one-tap **Add the ready-made shortc
 
 Text already in the target language, numbers and symbols stay as they are.
 
+## Tests
+
+`xcodebuild test -scheme ScreenTranslate -destination 'platform=iOS Simulator,name=iPhone 16'` runs the unit tests
+(listing terms, buying summary, prices, word list) and an OCR check on synthetic listing screenshots.
+`python3 TestSet/check_terms.py` checks the listing-term rules without a Mac. See [TestSet/README.md](TestSet/README.md)
+for what each check proves and the review sheet for a Japanese–English reader.
+
 ## Not tested yet
 
-This code was written without a Mac, so it has not been compiled. Expect a few small compile fixes in Xcode the
-first time. Known limits: vertical text (manga) is read poorly by Vision; with automatic detection Vision picks one main language per image, so a second script on the same screen may be read less accurately; the Shortcuts action can't show Apple's
+Written without a Mac and built on one only occasionally, so a new commit may need small compile fixes. Known limits: vertical text (manga) is read poorly by Vision; with automatic detection Vision picks one main language per image, so a second script on the same screen may be read less accurately; the Shortcuts action can't show Apple's
 language download prompt, which is why the app has a Download button.
 
 Live mode risks to check on a real iPhone: the extension has about 50 MB of memory, and if Vision's accurate reader

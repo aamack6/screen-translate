@@ -43,3 +43,23 @@ targets:
         INFOPLIST_FILE: Config/ScreenTranslateLive-Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: ScreenTranslate Live
         APPLICATION_EXTENSION_API_ONLY: YES
+  ScreenTranslateTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [ScreenTranslateTests]
+    dependencies:
+      - target: ScreenTranslate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aamack6.ScreenTranslateTests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  ScreenTranslate:
+    build:
+      targets:
+        ScreenTranslate: all
+    run:
+      config: Debug
+    test:
+      targets: [ScreenTranslateTests]
