@@ -1,0 +1,585 @@
+[
+ {
+  "file": "condition-shipping.png",
+  "listing": "condition-shipping",
+  "variant": "normal",
+  "lines": [
+   "ポケモンカード リーフィアex SAR",
+   "¥12,800",
+   "商品の状態：目立った傷や汚れなし",
+   "配送料の負担：送料込み（出品者負担）",
+   "スリーブから出してすぐ保管しました。",
+   "他サイトでも出品中のため早い者勝ちです。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "目立った傷や汚れなし",
+   "送料込み",
+   "他サイトでも出品中"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "condition-shipping-small.png",
+  "listing": "condition-shipping",
+  "variant": "small",
+  "lines": [
+   "ポケモンカード リーフィアex SAR",
+   "¥12,800",
+   "商品の状態：目立った傷や汚れなし",
+   "配送料の負担：送料込み（出品者負担）",
+   "スリーブから出してすぐ保管しました。",
+   "他サイトでも出品中のため早い者勝ちです。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "目立った傷や汚れなし",
+   "送料込み",
+   "他サイトでも出品中"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "condition-shipping-lowres.png",
+  "listing": "condition-shipping",
+  "variant": "lowres",
+  "lines": [
+   "ポケモンカード リーフィアex SAR",
+   "¥12,800",
+   "商品の状態：目立った傷や汚れなし",
+   "配送料の負担：送料込み（出品者負担）",
+   "スリーブから出してすぐ保管しました。",
+   "他サイトでも出品中のため早い者勝ちです。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "目立った傷や汚れなし",
+   "送料込み",
+   "他サイトでも出品中"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "condition-shipping-vertical.png",
+  "listing": "condition-shipping",
+  "variant": "vertical",
+  "lines": [
+   "ポケモンカード リーフィアex SAR",
+   "¥12,800",
+   "商品の状態：目立った傷や汚れなし",
+   "配送料の負担：送料込み（出品者負担）",
+   "スリーブから出してすぐ保管しました。",
+   "他サイトでも出品中のため早い者勝ちです。"
+  ],
+  "terms": [
+   "目立った傷や汚れなし",
+   "送料込み",
+   "他サイトでも出品中"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "one-from-photo.png",
+  "listing": "one-from-photo",
+  "variant": "normal",
+  "lines": [
+   "アクリルスタンド まとめ",
+   "¥1,500",
+   "写真の中からお好きな1点をお選びください。",
+   "コメントで番号をお知らせください。",
+   "商品の状態：やや傷や汚れあり",
+   "送料別・着払いでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "写真の中から",
+   "やや傷や汚れあり",
+   "送料別",
+   "着払い"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "one-from-photo-small.png",
+  "listing": "one-from-photo",
+  "variant": "small",
+  "lines": [
+   "アクリルスタンド まとめ",
+   "¥1,500",
+   "写真の中からお好きな1点をお選びください。",
+   "コメントで番号をお知らせください。",
+   "商品の状態：やや傷や汚れあり",
+   "送料別・着払いでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "写真の中から",
+   "やや傷や汚れあり",
+   "送料別",
+   "着払い"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "one-from-photo-lowres.png",
+  "listing": "one-from-photo",
+  "variant": "lowres",
+  "lines": [
+   "アクリルスタンド まとめ",
+   "¥1,500",
+   "写真の中からお好きな1点をお選びください。",
+   "コメントで番号をお知らせください。",
+   "商品の状態：やや傷や汚れあり",
+   "送料別・着払いでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "写真の中から",
+   "やや傷や汚れあり",
+   "送料別",
+   "着払い"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "box-only.png",
+  "listing": "box-only",
+  "variant": "normal",
+  "lines": [
+   "ゲーム機 空箱のみ",
+   "¥800",
+   "本体は付属しません。空箱のみの出品です。",
+   "箱に潰れと日焼けがあります。",
+   "ノークレーム・ノーリターンでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "空箱のみ",
+   "本体は付属しません",
+   "潰れ",
+   "日焼け",
+   "ノークレーム・ノーリターン"
+  ],
+  "unclear": [
+   "shipping and payment"
+  ]
+ },
+ {
+  "file": "box-only-small.png",
+  "listing": "box-only",
+  "variant": "small",
+  "lines": [
+   "ゲーム機 空箱のみ",
+   "¥800",
+   "本体は付属しません。空箱のみの出品です。",
+   "箱に潰れと日焼けがあります。",
+   "ノークレーム・ノーリターンでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "空箱のみ",
+   "本体は付属しません",
+   "潰れ",
+   "日焼け",
+   "ノークレーム・ノーリターン"
+  ],
+  "unclear": [
+   "shipping and payment"
+  ]
+ },
+ {
+  "file": "box-only-lowres.png",
+  "listing": "box-only",
+  "variant": "lowres",
+  "lines": [
+   "ゲーム機 空箱のみ",
+   "¥800",
+   "本体は付属しません。空箱のみの出品です。",
+   "箱に潰れと日焼けがあります。",
+   "ノークレーム・ノーリターンでお願いします。",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "空箱のみ",
+   "本体は付属しません",
+   "潰れ",
+   "日焼け",
+   "ノークレーム・ノーリターン"
+  ],
+  "unclear": [
+   "shipping and payment"
+  ]
+ },
+ {
+  "file": "box-only-vertical.png",
+  "listing": "box-only",
+  "variant": "vertical",
+  "lines": [
+   "ゲーム機 空箱のみ",
+   "¥800",
+   "本体は付属しません。空箱のみの出品です。",
+   "箱に潰れと日焼けがあります。",
+   "ノークレーム・ノーリターンでお願いします。"
+  ],
+  "terms": [
+   "空箱のみ",
+   "本体は付属しません",
+   "潰れ",
+   "日焼け",
+   "ノークレーム・ノーリターン"
+  ],
+  "unclear": [
+   "shipping and payment"
+  ]
+ },
+ {
+  "file": "preorder-stock-photo.png",
+  "listing": "preorder-stock-photo",
+  "variant": "normal",
+  "lines": [
+   "【予約】フィギュア 1/7スケール",
+   "¥24,000",
+   "発売日以降の発送となります。",
+   "画像はイメージです。実物とは異なる場合があります。",
+   "新品・未開封",
+   "代引き不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "予約",
+   "発売日",
+   "イメージ",
+   "未開封",
+   "代引き不可"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "preorder-stock-photo-small.png",
+  "listing": "preorder-stock-photo",
+  "variant": "small",
+  "lines": [
+   "【予約】フィギュア 1/7スケール",
+   "¥24,000",
+   "発売日以降の発送となります。",
+   "画像はイメージです。実物とは異なる場合があります。",
+   "新品・未開封",
+   "代引き不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "予約",
+   "発売日",
+   "イメージ",
+   "未開封",
+   "代引き不可"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "preorder-stock-photo-lowres.png",
+  "listing": "preorder-stock-photo",
+  "variant": "lowres",
+  "lines": [
+   "【予約】フィギュア 1/7スケール",
+   "¥24,000",
+   "発売日以降の発送となります。",
+   "画像はイメージです。実物とは異なる場合があります。",
+   "新品・未開封",
+   "代引き不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "予約",
+   "発売日",
+   "イメージ",
+   "未開封",
+   "代引き不可"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "opened-missing.png",
+  "listing": "opened-missing",
+  "variant": "normal",
+  "lines": [
+   "カメラ レンズ",
+   "¥18,500",
+   "開封済みですが未使用です。",
+   "付属品欠品：レンズキャップ",
+   "動作未確認のためジャンク扱いでお願いします。",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "開封済み",
+   "未使用",
+   "欠品",
+   "動作未確認",
+   "ジャンク"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "opened-missing-small.png",
+  "listing": "opened-missing",
+  "variant": "small",
+  "lines": [
+   "カメラ レンズ",
+   "¥18,500",
+   "開封済みですが未使用です。",
+   "付属品欠品：レンズキャップ",
+   "動作未確認のためジャンク扱いでお願いします。",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "開封済み",
+   "未使用",
+   "欠品",
+   "動作未確認",
+   "ジャンク"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "opened-missing-lowres.png",
+  "listing": "opened-missing",
+  "variant": "lowres",
+  "lines": [
+   "カメラ レンズ",
+   "¥18,500",
+   "開封済みですが未使用です。",
+   "付属品欠品：レンズキャップ",
+   "動作未確認のためジャンク扱いでお願いします。",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "開封済み",
+   "未使用",
+   "欠品",
+   "動作未確認",
+   "ジャンク"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "authenticity.png",
+  "listing": "authenticity",
+  "variant": "normal",
+  "lines": [
+   "ブランド 財布",
+   "¥9,800",
+   "正規品です。",
+   "鑑定はしていないため真贋不明とさせてください。",
+   "展示品のため小傷あり",
+   "送料無料",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "正規品",
+   "真贋不明",
+   "展示品",
+   "傷あり",
+   "送料無料"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "authenticity-small.png",
+  "listing": "authenticity",
+  "variant": "small",
+  "lines": [
+   "ブランド 財布",
+   "¥9,800",
+   "正規品です。",
+   "鑑定はしていないため真贋不明とさせてください。",
+   "展示品のため小傷あり",
+   "送料無料",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "正規品",
+   "真贋不明",
+   "展示品",
+   "傷あり",
+   "送料無料"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "authenticity-lowres.png",
+  "listing": "authenticity",
+  "variant": "lowres",
+  "lines": [
+   "ブランド 財布",
+   "¥9,800",
+   "正規品です。",
+   "鑑定はしていないため真贋不明とさせてください。",
+   "展示品のため小傷あり",
+   "送料無料",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "正規品",
+   "真贋不明",
+   "展示品",
+   "傷あり",
+   "送料無料"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "negation.png",
+  "listing": "negation",
+  "variant": "normal",
+  "lines": [
+   "トレカ 10枚セット",
+   "¥3,000",
+   "傷なし・折れなし",
+   "ジャンクではありません。",
+   "10点セットでの販売です。バラ売り不可",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "傷なし",
+   "折れなし",
+   "ジャンクではありません",
+   "点セット",
+   "バラ売り"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "negation-small.png",
+  "listing": "negation",
+  "variant": "small",
+  "lines": [
+   "トレカ 10枚セット",
+   "¥3,000",
+   "傷なし・折れなし",
+   "ジャンクではありません。",
+   "10点セットでの販売です。バラ売り不可",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "傷なし",
+   "折れなし",
+   "ジャンクではありません",
+   "点セット",
+   "バラ売り"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "negation-lowres.png",
+  "listing": "negation",
+  "variant": "lowres",
+  "lines": [
+   "トレカ 10枚セット",
+   "¥3,000",
+   "傷なし・折れなし",
+   "ジャンクではありません。",
+   "10点セットでの販売です。バラ売り不可",
+   "送料込み",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "傷なし",
+   "折れなし",
+   "ジャンクではありません",
+   "点セット",
+   "バラ売り"
+  ],
+  "unclear": []
+ },
+ {
+  "file": "mixed-english.png",
+  "listing": "mixed-english",
+  "variant": "normal",
+  "lines": [
+   "PSA10 鑑定品 Japanese Card",
+   "¥45,000",
+   "Condition: 新品、未使用",
+   "Ships from Japan 送料別",
+   "No returns 返品不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "鑑定品",
+   "新品、未使用",
+   "送料別",
+   "返品不可"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "mixed-english-small.png",
+  "listing": "mixed-english",
+  "variant": "small",
+  "lines": [
+   "PSA10 鑑定品 Japanese Card",
+   "¥45,000",
+   "Condition: 新品、未使用",
+   "Ships from Japan 送料別",
+   "No returns 返品不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "鑑定品",
+   "新品、未使用",
+   "送料別",
+   "返品不可"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ },
+ {
+  "file": "mixed-english-lowres.png",
+  "listing": "mixed-english",
+  "variant": "lowres",
+  "lines": [
+   "PSA10 鑑定品 Japanese Card",
+   "¥45,000",
+   "Condition: 新品、未使用",
+   "Ships from Japan 送料別",
+   "No returns 返品不可",
+   "購入手続きへ"
+  ],
+  "terms": [
+   "鑑定品",
+   "新品、未使用",
+   "送料別",
+   "返品不可"
+  ],
+  "unclear": [
+   "what's included"
+  ]
+ }
+]

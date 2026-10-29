@@ -1,0 +1,65 @@
+# Fallback only: if ScreenTranslate.xcodeproj ever fails to open, regenerate it with
+#   brew install xcodegen && xcodegen generate
+name: ScreenTranslate
+options:
+  deploymentTarget:
+    iOS: "26.0"
+targets:
+  ScreenTranslate:
+    type: application
+    platform: iOS
+    sources: [ScreenTranslate, Shared]
+    dependencies:
+      - target: ScreenTranslateLive
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aamack6.ScreenTranslate
+        INFOPLIST_FILE: Config/ScreenTranslate-Info.plist
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: ScreenTranslate
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSCameraUsageDescription: Point the camera at a menu, sign or document to translate it on this iPhone.
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Lets you save translated screenshots to Photos when you choose to.
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  ScreenTranslateLive:
+    type: app-extension
+    platform: iOS
+    sources: [Broadcast, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aamack6.ScreenTranslate.Broadcast
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Config/ScreenTranslateLive-Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: ScreenTranslate Live
+        APPLICATION_EXTENSION_API_ONLY: YES
+  ScreenTranslateTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [ScreenTranslateTests]
+    dependencies:
+      - target: ScreenTranslate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aamack6.ScreenTranslateTests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  ScreenTranslate:
+    build:
+      targets:
+        ScreenTranslate: all
+    run:
+      config: Debug
+    test:
+      targets: [ScreenTranslateTests]
