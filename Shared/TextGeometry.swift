@@ -6,6 +6,8 @@ struct TextLine {
     let rect: CGRect
     /// The language to translate this line from; nil = leave it untranslated (prices only).
     var language: AppLanguage?
+    /// Vision's confidence in the reading, 0...1.
+    var confidence: Float = 1
 }
 
 /// Neighbouring lines merged into one paragraph, so sentences that wrap are translated whole.
@@ -19,6 +21,9 @@ struct TextBlock {
     }
 
     var language: AppLanguage? { lines.first?.language }
+
+    /// Vision's confidence in its least certain line.
+    var confidence: Float { lines.map(\.confidence).min() ?? 1 }
 
     var text: String {
         lines.map(\.text).joined(separator: language?.lineJoiner ?? " ")

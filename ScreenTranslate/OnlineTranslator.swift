@@ -23,8 +23,15 @@ enum OnlineEngine: String, CaseIterable, Identifiable {
     /// The engine to use for the next translation, or nil for Apple's. Needs Pro and a saved key.
     static var active: OnlineEngine? {
         let engine = OnlineEngine(rawValue: UserDefaults.standard.string(forKey: SettingsKey.onlineEngine) ?? "") ?? .off
-        guard engine != .off, Usage.isProCached, APIKeyStore.key(for: engine) != nil else { return nil }
+        guard engine != .off, engine.hasConsent, Usage.isProCached, APIKeyStore.key(for: engine) != nil else { return nil }
         return engine
+    }
+
+    /// The user agreed that text read from screenshots may be sent to this service. Nothing is
+    /// sent online without it.
+    var hasConsent: Bool {
+        get { UserDefaults.standard.bool(forKey: "onlineConsent.\(rawValue)") }
+        nonmutating set { UserDefaults.standard.set(newValue, forKey: "onlineConsent.\(rawValue)") }
     }
 }
 

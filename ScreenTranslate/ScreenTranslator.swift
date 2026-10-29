@@ -42,6 +42,7 @@ enum ScreenTranslateError: LocalizedError {
     case languagesUnsupported(AppLanguage, AppLanguage)
     case renderFailed
     case translationFailed(String)
+    case noTextFound
 
     var errorDescription: String? {
         switch self {
@@ -53,6 +54,8 @@ enum ScreenTranslateError: LocalizedError {
             return "\(source.displayName) to \(target.displayName) isn't available on this device. Check that iOS is up to date."
         case .renderFailed:
             return "The translated image couldn't be created. Try a regular screenshot rather than a very long image."
+        case .noTextFound:
+            return "No text to translate was found. If the text is small, zoom in and try again. Vertical Japanese can't be read yet; text inside photos may be missed."
         case .translationFailed(let details):
             return "Translation failed. Open ScreenTranslate, download the languages again, and retry. Details: \(details)"
         }
@@ -70,13 +73,13 @@ enum ScreenTranslateError: LocalizedError {
 /// action and by the app's own photo and camera translation.
 enum ScreenTranslator {
     static func translate(_ data: Data, settings: TranslationSettings) async throws -> RenderedTranslation {
-        guard let image = loadImage(data) else { throw ScreenTranslateError.unreadableImage }
+        guard let image = decode(data) else { throw ScreenTranslateError.unreadableImage }
         return try await translate(image, settings: settings)
     }
 
     /// Joins screenshots taken while scrolling into one long page and translates it as a whole.
     static func translateJoined(_ screenshots: [Data], settings: TranslationSettings) async throws -> (RenderedTranslation, Data) {
-        let images = screenshots.compactMap(loadImage)
+        let images = screenshots.compactMap(decode)
         guard images.count == screenshots.count, let joined = ImageStitcher.stitch(images) else {
             throw ScreenTranslateError.unreadableImage
         }
@@ -147,22 +150,7 @@ enum ScreenTranslator {
 
         let regions = blocks.indices.map { index in
             let original = originals[index]
-            let language = blocks[index].language ?? settings.source
-            var notes: [String] = []
-            var isWarning = false
-            if let options = settings.prices {
-                for price in PriceParser.prices(in: original, language: language) where price.currency != options.currency {
-                    if let rate = rates[price.currency] {
-                        notes.append(priceNote(price.amount * rate, options: options))
-                    }
-                }
-            }
-            if settings.flagListingTerms, language == .japanese {
-                for match in ListingTerms.matches(in: original) {
-                    notes.append("\(match.isWarning ? "⚠︎ " : "✓ ")\(match.word): \(match.meaning)")
-                    isWarning = isWarning || match.isWarning
-                }
-            }
+            let (notes, isWarning) = annotations(for: original, language: blocks[index].language ?? settings.source, settings: settings, rates: rates)
             return TranslatedRegion(
                 original: original,
                 translated: translations[index],
@@ -170,11 +158,15 @@ enum ScreenTranslator {
                 rect: blocks[index].rect,
                 notes: notes,
                 isWarning: isWarning,
-                lineHeight: blocks[index].lines.map(\.rect.height).max()
+                lineHeight: blocks[index].lines.map(\.rect.height).max(),
+                uncertain: blocks[index].confidence < TranslatedRegion.uncertainBelow ? true : nil
             )
         }
 
-        guard let jpeg = OverlayRenderer.render(image: image, regions: regions, obstacles: recognized.map(\.rect), options: settings.overlay) else {
+        let summary = settings.flagListingTerms
+            ? BuyingSummary.make(from: regions.filter { $0.source == .japanese }.map(\.original))?.lines ?? []
+            : []
+        guard let jpeg = OverlayRenderer.render(image: image, regions: regions, obstacles: recognized.map(\.rect), options: settings.overlay, summary: summary) else {
             throw ScreenTranslateError.renderFailed
         }
         finishStep("Draw")
@@ -209,11 +201,36 @@ enum ScreenTranslator {
         return results
     }
 
+    /// The notes under a translation: converted prices, and explanations of shopping terms,
+    /// each naming the Japanese phrase it comes from.
+    static func annotations(for original: String, language: AppLanguage?, settings: TranslationSettings, rates: [String: Double]) -> (notes: [String], isWarning: Bool) {
+        var notes: [String] = []
+        var isWarning = false
+        if let options = settings.prices {
+            for price in PriceParser.prices(in: original, language: language) where price.currency != options.currency {
+                if let rate = rates[price.currency] {
+                    notes.append(priceNote(price.amount * rate, options: options))
+                }
+            }
+        }
+        if settings.flagListingTerms, language == .japanese {
+            for match in ListingTerms.matches(in: original) {
+                notes.append(match.note)
+                isWarning = isWarning || match.isWarning
+            }
+        }
+        return (notes, isWarning)
+    }
+
     /// One exchange rate per currency found on screen.
     private static func priceRates(for originals: [String], blocks: [TextBlock], settings: TranslationSettings) async -> [String: Double] {
+        await priceRates(for: originals.indices.map { (originals[$0], blocks[$0].language ?? settings.source) }, settings: settings)
+    }
+
+    static func priceRates(for texts: [(String, AppLanguage?)], settings: TranslationSettings) async -> [String: Double] {
         guard let options = settings.prices else { return [:] }
-        let currencies = Set(originals.indices.flatMap { index in
-            PriceParser.prices(in: originals[index], language: blocks[index].language ?? settings.source).map(\.currency)
+        let currencies = Set(texts.flatMap { text, language in
+            PriceParser.prices(in: text, language: language).map(\.currency)
         })
         var rates: [String: Double] = [:]
         for currency in currencies where currency != options.currency {
@@ -231,7 +248,7 @@ enum ScreenTranslator {
 
     /// Decodes the image with its orientation applied. Very large images (long web page captures,
     /// 48 MP photos) are scaled down so they fit in memory.
-    private static func loadImage(_ data: Data) -> CGImage? {
+    static func decode(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         // Joined pages are long but narrow; let them keep their full height.
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]

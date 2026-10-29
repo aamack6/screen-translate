@@ -28,7 +28,7 @@ enum TextRecognizer {
             for line in try recognizeLines(with: handler, imageSize: CGSize(width: width, height: bottom - top), language: language) {
                 let rect = line.rect.offsetBy(dx: 0, dy: top)
                 if rect.midY >= ownedTop, rect.midY < ownedBottom {
-                    lines.append(TextLine(text: line.text, rect: rect))
+                    lines.append(TextLine(text: line.text, rect: rect, confidence: line.confidence))
                 }
             }
             if bottom >= height { break }
@@ -72,7 +72,8 @@ enum TextRecognizer {
             guard !text.isEmpty else { return nil }
             return TextLine(
                 text: text,
-                rect: TextGeometry.topLeftFrame(fromVision: observation.boundingBox, imageSize: size)
+                rect: TextGeometry.topLeftFrame(fromVision: observation.boundingBox, imageSize: size),
+                confidence: candidate.confidence
             )
         }
     }

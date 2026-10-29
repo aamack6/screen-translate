@@ -128,14 +128,17 @@ struct TranslationCache {
         orderURL = directory?.appendingPathComponent("\(name)-order.json")
     }
 
+    /// On unless the user turned it off in Options.
+    static var isEnabled: Bool { UserDefaults.standard.object(forKey: SettingsKey.rememberTranslations) as? Bool ?? true }
+
     func load() -> [String: String] {
-        guard let url, let data = try? Data(contentsOf: url) else { return [:] }
+        guard Self.isEnabled, let url, let data = try? Data(contentsOf: url) else { return [:] }
         return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
     }
 
     /// Saves the translations, forgetting the oldest once there are more than `limit`.
     func save(_ translations: [String: String], adding added: [String]) {
-        guard let url, let orderURL else { return }
+        guard Self.isEnabled, let url, let orderURL else { return }
         var order = ((try? Data(contentsOf: orderURL)).flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? [])
         order.removeAll { added.contains($0) }
         order.append(contentsOf: added)

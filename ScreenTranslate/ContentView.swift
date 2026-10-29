@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var apiKey = ""
     @State private var trigger: Trigger = .floatingDot
     @State private var keyCheck: String?
+    @State private var consentEngine: OnlineEngine?
+    @AppStorage(SettingsKey.rememberTranslations) private var rememberTranslations = true
 
     /// With automatic detection, the language whose download the Language section shows.
     @State private var downloadSource: AppLanguage = .japanese
@@ -28,6 +30,8 @@ struct ContentView: View {
     @State private var joinItems: [PhotosPickerItem] = []
     @State private var showCamera = false
     @State private var showLiveCamera = false
+    @ObservedObject private var incoming = IncomingScreenshot.shared
+    @AppStorage("didShowOnboarding") private var didShowOnboarding = false
     @State private var isTranslating = false
     @State private var shownResult: ShownResult?
     @State private var translateError: String?
@@ -72,9 +76,21 @@ struct ContentView: View {
                 await refreshStatus()
             }
             .navigationDestination(item: $shownResult) { result in
-                ResultView(jpeg: result.jpeg, regions: result.regions, target: result.target, timings: result.timings) { language in
-                    Task { await retranslate(result, from: language) }
-                }
+                ResultView(
+                    jpeg: result.jpeg, regions: result.regions, target: result.target, timings: result.timings,
+                    originalImage: result.imageData,
+                    onChangeSource: { language in Task { await retranslate(result, from: language) } },
+                    onTranslateArea: { area in Task { await translate(area, skipStatusBar: false) } }
+                )
+                .id(result.id)
+            }
+            .onReceive(incoming.$data) { data in
+                guard let data else { return }
+                incoming.data = nil
+                Task { await translate(data, skipStatusBar: true) }
+            }
+            .sheet(isPresented: Binding(get: { !didShowOnboarding }, set: { if !$0 { didShowOnboarding = true } })) {
+                OnboardingView { didShowOnboarding = true }
             }
             .task { await store.load() }
             .task { await Translator.warmUpLikelyPair() }
@@ -265,7 +281,9 @@ struct ContentView: View {
                 Text("1. In Shortcuts, create a shortcut called Screen Translate.")
                 Text("2. Add Take Screenshot.")
                 Text("3. Add Translate Screenshot, with the screenshot from step 2.")
-                Text("4. Add Quick Look, showing the result of step 3.")
+                Text("4. Add Quick Look, showing the result of step 3. Close it to go straight back to what you were doing.")
+                Text("Or, in step 3, use Translate Screenshot in App instead (and skip step 4): the result opens here, where you can select an area, correct misread text and see a buying summary. Swipe back to your app afterwards.")
+                    .foregroundStyle(.secondary)
             }
             .font(.callout)
             Picker("Start it with", selection: $trigger) {
@@ -359,7 +377,7 @@ struct ContentView: View {
                     }
                 }
                 if (source == nil || source == .japanese), flagListingTerms {
-                    Text("Listing words like ジャンク (junk), 傷あり (scratched) or 海外版 (overseas edition) get a plain-English note, and the panel gets an orange border.")
+                    Text("Words about condition, what's included, quantity, shipping, pre-orders, photos and authenticity, like ジャンク (junk), 本体のみ (item only) or 送料別 (shipping extra), get a note naming the Japanese phrase, and cautions get an orange border. A buying summary under the screenshot answers what's included, the condition, and shipping, and lists what wasn't found. It reports the seller's wording; it can't confirm it.")
                 }
             }
         }
@@ -405,6 +423,19 @@ struct ContentView: View {
         .onChange(of: onlineEngine) { _, engine in
             apiKey = APIKeyStore.key(for: engine) ?? ""
             keyCheck = nil
+            if engine != .off, !engine.hasConsent { consentEngine = engine }
+        }
+        .alert("Send text to \(consentEngine?.displayName ?? "")?", isPresented: Binding(get: { consentEngine != nil }, set: { if !$0 { consentEngine = nil } })) {
+            Button("Allow") {
+                consentEngine?.hasConsent = true
+                consentEngine = nil
+            }
+            Button("Cancel", role: .cancel) {
+                onlineEngine = .off
+                consentEngine = nil
+            }
+        } message: {
+            Text("The text read from your screenshots, the live camera and web pages will be sent to this service to be translated, under its privacy policy. Images are never sent. With Apple's engine, everything stays on this iPhone.")
         }
     }
 
@@ -422,11 +453,19 @@ struct ContentView: View {
     }
 
     private var optionsSection: some View {
-        Section("Options") {
+        Section {
             NavigationLink("My word list") { WordListView() }
             Toggle("Dark translation panels", isOn: $darkPanels)
             Toggle("List all translations under the image", isOn: $appendFullText)
             Toggle("Keep history on this iPhone", isOn: $keepHistory)
+            Toggle("Remember recent translations", isOn: $rememberTranslations)
+                .onChange(of: rememberTranslations) { _, on in
+                    if !on { TranslationCache.clearAll() }
+                }
+        } header: {
+            Text("Options")
+        } footer: {
+            Text("History and remembered translations stay on this iPhone and aren't included in backups. Remembering translations makes repeat screens nearly instant; it keeps up to 3,000 recent lines of text. Clear in History deletes both.")
         }
     }
 
@@ -489,7 +528,7 @@ struct ContentView: View {
         do {
             let (rendered, data) = try await perform()
             if rendered.regions.isEmpty {
-                translateError = "No text to translate was found in that image."
+                translateError = ScreenTranslateError.noTextFound.localizedDescription
             }
             if keepHistory, !rendered.regions.isEmpty {
                 try? HistoryStore().add(rendered)

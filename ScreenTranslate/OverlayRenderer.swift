@@ -12,6 +12,16 @@ struct TranslatedRegion: Codable {
     var isWarning = false
     /// Height of the original's tallest line, so the translation can match its size.
     var lineHeight: CGFloat?
+    /// The text recognizer wasn't sure it read the original correctly, so the translation may be
+    /// wrong too. Shown with a "?" and a dashed border rather than as a confident translation.
+    /// Optional so history saved before it existed still loads.
+    var uncertain: Bool?
+
+    var isUncertain: Bool { uncertain == true }
+
+    /// Vision's accurate mode rates clear text 1.0 and doubtful readings 0.3 to 0.5. Below this
+    /// counts as unsure. To be tuned with real screenshots.
+    static let uncertainBelow: Float = 0.5
 }
 
 /// Draws translation panels over the original text. Translations too long for their panel get a
@@ -19,7 +29,8 @@ struct TranslatedRegion: Codable {
 enum OverlayRenderer {
     /// - Parameter obstacles: every piece of text on the image, translated or not, so panels don't
     ///   grow over text that's left as it is.
-    static func render(image: CGImage, regions: [TranslatedRegion], obstacles: [CGRect], options: OverlayOptions) -> Data? {
+    /// - Parameter summary: lines of a buying summary, listed under the screenshot.
+    static func render(image: CGImage, regions: [TranslatedRegion], obstacles: [CGRect], options: OverlayOptions, summary: [String] = []) -> Data? {
         let width = CGFloat(image.width)
         let height = CGFloat(image.height)
         let minFontSize = max(width * 0.026, 10)
@@ -41,9 +52,9 @@ enum OverlayRenderer {
             panels.append(panel)
         }
 
-        let footer = footerText(footnotes, fontSize: minFontSize * 1.1, colors: colors)
+        let footer = footerText(footnotes, summary: summary, fontSize: minFontSize * 1.1, colors: colors)
         let footerPadding = minFontSize
-        let footerHeight = footnotes.isEmpty ? 0 : ceil(measure(footer, width: width - footerPadding * 2).height) + footerPadding * 2
+        let footerHeight = footnotes.isEmpty && summary.isEmpty ? 0 : ceil(measure(footer, width: width - footerPadding * 2).height) + footerPadding * 2
 
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -60,6 +71,11 @@ enum OverlayRenderer {
                 if panel.region.isWarning {
                     colors.warning.setStroke()
                     path.lineWidth = max(minFontSize * 0.15, 2)
+                    path.stroke()
+                } else if panel.region.isUncertain {
+                    colors.uncertain.setStroke()
+                    path.lineWidth = max(minFontSize * 0.12, 1.5)
+                    path.setLineDash([minFontSize * 0.4, minFontSize * 0.25], count: 2, phase: 0)
                     path.stroke()
                 }
                 let text = panelText(panel.region, size: panel.fontSize, colors: colors, number: panel.number)
@@ -146,6 +162,7 @@ enum OverlayRenderer {
         let footer: UIColor
         let note: UIColor
         let warning: UIColor
+        let uncertain: UIColor
 
         init(dark: Bool) {
             panel = dark ? UIColor(white: 0.08, alpha: 0.9) : UIColor(white: 1, alpha: 0.94)
@@ -153,6 +170,7 @@ enum OverlayRenderer {
             footer = dark ? UIColor(white: 0.08, alpha: 1) : .white
             note = dark ? UIColor(red: 0.45, green: 0.85, blue: 0.55, alpha: 1) : UIColor(red: 0.0, green: 0.45, blue: 0.2, alpha: 1)
             warning = dark ? UIColor(red: 1.0, green: 0.62, blue: 0.2, alpha: 1) : UIColor(red: 0.85, green: 0.35, blue: 0.0, alpha: 1)
+            uncertain = dark ? UIColor(white: 0.7, alpha: 1) : UIColor(white: 0.4, alpha: 1)
         }
     }
 
@@ -169,7 +187,7 @@ enum OverlayRenderer {
     /// The translation, then each note on its own line in a smaller size: warnings in orange,
     /// prices and good-news terms in green.
     private static func panelText(_ region: TranslatedRegion, size: CGFloat, colors: Colors, number: Int?) -> NSAttributedString {
-        let prefix = number.map { "[\($0)] " } ?? ""
+        let prefix = (number.map { "[\($0)] " } ?? "") + (region.isUncertain ? "(?) " : "")
         let text = NSMutableAttributedString(attributedString: attributed(prefix + region.translated, size: size, color: colors.text))
         for note in region.notes {
             let color = note.hasPrefix("⚠") ? colors.warning : colors.note
@@ -178,10 +196,19 @@ enum OverlayRenderer {
         return text
     }
 
-    private static func footerText(_ notes: [(number: Int, region: TranslatedRegion)], fontSize: CGFloat, colors: Colors) -> NSAttributedString {
+    private static func footerText(_ notes: [(number: Int, region: TranslatedRegion)], summary: [String], fontSize: CGFloat, colors: Colors) -> NSAttributedString {
         let text = NSMutableAttributedString()
+        if !summary.isEmpty {
+            text.append(NSAttributedString(string: "Buying summary, from the seller's wording", attributes: [
+                .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
+                .foregroundColor: colors.text,
+            ]))
+            for line in summary {
+                text.append(attributed("\n" + line, size: fontSize * 0.9, color: line.contains("⚠") ? colors.warning : colors.text))
+            }
+        }
         for (offset, note) in notes.enumerated() {
-            if offset > 0 { text.append(attributed("\n\n", size: fontSize, color: colors.text)) }
+            if offset > 0 || !summary.isEmpty { text.append(attributed("\n\n", size: fontSize, color: colors.text)) }
             text.append(panelText(note.region, size: fontSize, colors: colors, number: note.number))
         }
         return text

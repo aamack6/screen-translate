@@ -33,6 +33,8 @@ struct TranslateScreenshotIntent: AppIntent {
         if let language { settings.source = language }
         if let target { settings.target = target }
         let result = try await ScreenTranslator.translate(screenshot.data, settings: settings)
+        // Say so instead of showing the screenshot back unchanged, which looks like a failure.
+        guard result.regions.contains(where: { $0.source != nil }) else { throw ScreenTranslateError.noTextFound }
         if AppSettings.keepHistory, !result.regions.isEmpty {
             try? HistoryStore().add(result)
         }
@@ -65,4 +67,31 @@ extension AppLanguage: AppEnum {
         .indonesian: "Indonesian",
         .hindi: "Hindi",
     ]
+}
+
+/// Same as Translate Screenshot, but shows the result in ScreenTranslate instead of handing an
+/// image back to Shortcuts. Slower to get back from, but the result can be cropped, corrected,
+/// compared with the original and read as a list.
+struct TranslateScreenshotInAppIntent: AppIntent {
+    static let title: LocalizedStringResource = "Translate Screenshot in App"
+    static let description = IntentDescription(
+        "Opens the screenshot in ScreenTranslate and translates it there, where you can select an area, correct misread text, see the original, and read a buying summary."
+    )
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Screenshot", supportedContentTypes: [.image], inputConnectionBehavior: .connectToPreviousIntentResult)
+    var screenshot: IntentFile
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        IncomingScreenshot.shared.data = screenshot.data
+        return .result()
+    }
+}
+
+/// A screenshot handed to the app by the Shortcuts action, waiting to be translated on screen.
+@MainActor
+final class IncomingScreenshot: ObservableObject {
+    static let shared = IncomingScreenshot()
+    @Published var data: Data?
 }

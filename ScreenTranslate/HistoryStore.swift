@@ -19,8 +19,13 @@ struct HistoryStore {
 
     init(fileManager: FileManager = .default) {
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        directory = base.appendingPathComponent("History", isDirectory: true)
+        var directory = base.appendingPathComponent("History", isDirectory: true)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Screenshots can be private; keep them on this iPhone only, out of iCloud and computer backups.
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? directory.setResourceValues(values)
+        self.directory = directory
     }
 
     func load() -> [HistoryItem] {

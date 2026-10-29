@@ -177,6 +177,7 @@ enum SettingsKey {
     static let keepHistory = "keepHistory"
     static let lastDetectedSource = "lastDetectedSource"
     static let onlineEngine = "onlineEngine"
+    static let rememberTranslations = "rememberTranslations"
 }
 
 /// Stored source-language value meaning "detect the language automatically".
